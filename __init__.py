@@ -1,8 +1,10 @@
 from .control_nodes import FloatControl, IntControl
+from .quick_shape_mask import QuickShapeMask
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
-    "IntControl": IntControl
+    "IntControl": IntControl,
+    "QuickShapeMask": QuickShapeMask
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {

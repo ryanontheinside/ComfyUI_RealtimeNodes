@@ -1,0 +1,110 @@
+{
+  "206": {
+    "inputs": {
+      "image": "example.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "224": {
+    "inputs": {
+      "steps_per_cycle": 30,
+      "movement_type": "sine_wave",
+      "always_execute": true,
+      "maximum_value": 512,
+      "minimum_value": 1,
+      "starting_value": 1
+    },
+    "class_type": "IntControl",
+    "_meta": {
+      "title": "Int Control (RyanOnTheInside)"
+    }
+  },
+  "227": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "228",
+        0
+      ],
+      "source": [
+        "206",
+        0
+      ],
+      "mask": [
+        "234",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "228": {
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "batch_size": 1,
+      "color": 0
+    },
+    "class_type": "EmptyImage",
+    "_meta": {
+      "title": "EmptyImage"
+    }
+  },
+  "231": {
+    "inputs": {
+      "steps_per_cycle": 29,
+      "movement_type": "sine_wave",
+      "always_execute": true,
+      "maximum_value": 502,
+      "minimum_value": 1,
+      "starting_value": 474
+    },
+    "class_type": "IntControl",
+    "_meta": {
+      "title": "Int Control (RyanOnTheInside)"
+    }
+  },
+  "233": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "227",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "234": {
+    "inputs": {
+      "shape": "circle",
+      "width": [
+        "224",
+        0
+      ],
+      "height": [
+        "231",
+        0
+      ],
+      "x": 256,
+      "y": 256,
+      "canvas_width": 512,
+      "canvas_height": 512,
+      "batch_size": 1
+    },
+    "class_type": "QuickShapeMask",
+    "_meta": {
+      "title": "QuickShapeMask"
+    }
+  }
+}
