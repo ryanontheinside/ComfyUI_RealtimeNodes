@@ -1,0 +1,390 @@
+{
+  "last_node_id": 234,
+  "last_link_id": 59,
+  "nodes": [
+    {
+      "id": 224,
+      "type": "IntControl",
+      "pos": {
+        "0": 270,
+        "1": 350
+      },
+      "size": {
+        "0": 315,
+        "1": 178
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            57
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "IntControl"
+      },
+      "widgets_values": [
+        30,
+        "sine_wave",
+        true,
+        512,
+        1,
+        1
+      ]
+    },
+    {
+      "id": 231,
+      "type": "IntControl",
+      "pos": {
+        "0": 270,
+        "1": 590
+      },
+      "size": {
+        "0": 315,
+        "1": 178
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            58
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "IntControl"
+      },
+      "widgets_values": [
+        29,
+        "sine_wave",
+        true,
+        502,
+        1,
+        474
+      ]
+    },
+    {
+      "id": 218,
+      "type": "FloatControl",
+      "pos": {
+        "0": 274,
+        "1": 919
+      },
+      "size": {
+        "0": 390.5999755859375,
+        "1": 178
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "FLOAT",
+          "type": "FLOAT",
+          "links": [],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FloatControl"
+      },
+      "widgets_values": [
+        30,
+        "sine_wave",
+        true,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": 206,
+      "type": "LoadImage",
+      "pos": {
+        "0": 765,
+        "1": 262
+      },
+      "size": {
+        "0": 315,
+        "1": 314
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            47
+          ],
+          "slot_index": 0,
+          "shape": 3
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 227,
+      "type": "ImageCompositeMasked",
+      "pos": {
+        "0": 1278,
+        "1": 316
+      },
+      "size": {
+        "0": 315,
+        "1": 146
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "destination",
+          "type": "IMAGE",
+          "link": 46
+        },
+        {
+          "name": "source",
+          "type": "IMAGE",
+          "link": 47
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 59
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            56
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageCompositeMasked"
+      },
+      "widgets_values": [
+        0,
+        0,
+        false
+      ]
+    },
+    {
+      "id": 233,
+      "type": "SaveImage",
+      "pos": {
+        "0": 1684,
+        "1": 317
+      },
+      "size": [
+        315,
+        270
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 56
+        }
+      ],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "ComfyUI"
+      ]
+    },
+    {
+      "id": 228,
+      "type": "EmptyImage",
+      "pos": {
+        "0": 751,
+        "1": 58
+      },
+      "size": {
+        "0": 315,
+        "1": 130
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            46
+          ],
+          "slot_index": 0,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyImage"
+      },
+      "widgets_values": [
+        512,
+        512,
+        1,
+        0
+      ]
+    },
+    {
+      "id": 234,
+      "type": "QuickShapeMask",
+      "pos": {
+        "0": 770,
+        "1": 642
+      },
+      "size": [
+        315,
+        226
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "link": 57,
+          "widget": {
+            "name": "width"
+          }
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "link": 58,
+          "widget": {
+            "name": "height"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            59
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "QuickShapeMask"
+      },
+      "widgets_values": [
+        "circle",
+        64,
+        64,
+        256,
+        256,
+        512,
+        512,
+        1
+      ]
+    }
+  ],
+  "links": [
+    [
+      46,
+      228,
+      0,
+      227,
+      0,
+      "IMAGE"
+    ],
+    [
+      47,
+      206,
+      0,
+      227,
+      1,
+      "IMAGE"
+    ],
+    [
+      56,
+      227,
+      0,
+      233,
+      0,
+      "IMAGE"
+    ],
+    [
+      57,
+      224,
+      0,
+      234,
+      0,
+      "INT"
+    ],
+    [
+      58,
+      231,
+      0,
+      234,
+      1,
+      "INT"
+    ],
+    [
+      59,
+      234,
+      0,
+      227,
+      2,
+      "MASK"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0834705943389067,
+      "offset": [
+        -150.8890623486404,
+        -198.28032954985966
+      ]
+    }
+  },
+  "version": 0.4
+}

@@ -3,10 +3,8 @@ import time
 
 class ValueControlBase:
     """Base class for float and integer control nodes"""
-    
     # Class level storage for persistent values between executions
     instances = {}
-    
     @classmethod
     def INPUT_TYPES(cls):
         """Base input types that are common to both Float and Int controls"""
@@ -58,7 +56,6 @@ class ValueControlBase:
 
     def update_value_base(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute=True):
         instance = self.__class__.instances[self.instance_id]
-        
         # Initialize if this is the first run
         if instance['current_value'] is None:
             instance['current_value'] = starting_value
