@@ -211,3 +211,73 @@ class IntControl(ValueControlBase):
     def update_value(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute=True):
         result = self.update_value_base(maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute)
         return (int(round(result[0])),)
+
+class StringControl(ValueControlBase):
+    """A control node that outputs different strings based on patterns over time."""
+    
+    DESCRIPTION = "Generates string outputs that change over time according to various patterns. Useful for cycling through text options or creating pattern-based text animations."
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        input_types = super().INPUT_TYPES()
+        input_types["required"].update({
+            "strings": ("STRING", {
+                "multiline": True,
+                "default": "first string\nsecond string\nthird string",
+                "tooltip": "List of strings to cycle through (one per line)"
+            }),
+        })
+        return input_types
+
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "update_value"
+    CATEGORY = "control"
+    
+    def update_value(self, strings, steps_per_cycle, movement_type, always_execute=True):
+        # Split the input strings into a list
+        string_list = [s.strip() for s in strings.split('\n') if s.strip()]
+        if not string_list:
+            return ("",)  # Return empty string if no valid strings provided
+        
+        instance = self.__class__.instances[self.instance_id]
+        # Initialize if this is the first run
+        if instance['current_value'] is None:
+            instance['current_value'] = string_list[0]
+            instance['iteration'] = 0
+            return (string_list[0],)
+
+        # Increment iteration counter
+        instance['iteration'] += 1
+        current_iteration = instance['iteration']
+        
+        # Calculate phase (0 to 1)
+        phase = (current_iteration % steps_per_cycle) / steps_per_cycle
+
+        # Get the number of strings
+        num_strings = len(string_list)
+
+        # Update value based on movement type
+        if movement_type == "static":
+            index = 0
+        
+        elif movement_type in ["sine_wave", "triangle_wave", "sawtooth"]:
+            # Map phase to string index
+            index = int(phase * num_strings)
+        
+        elif movement_type == "square_wave":
+            index = 0 if phase < 0.5 else num_strings // 2
+        
+        elif movement_type in ["bounce", "exponential", "logarithmic", "pulse"]:
+            index = int(phase * (num_strings - 1))
+        
+        elif movement_type in ["random_walk", "smooth_noise"]:
+            # Use hash of current iteration for reproducible randomness
+            index = hash(str(current_iteration)) % num_strings
+
+        # Ensure index is within bounds
+        index = max(0, min(num_strings - 1, index))
+        
+        # Update and return new value
+        new_value = string_list[index]
+        instance['current_value'] = new_value
+        return (new_value,)
