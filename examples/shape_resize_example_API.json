@@ -9,20 +9,6 @@
       "title": "Load Image"
     }
   },
-  "224": {
-    "inputs": {
-      "steps_per_cycle": 30,
-      "movement_type": "sine_wave",
-      "always_execute": true,
-      "maximum_value": 512,
-      "minimum_value": 1,
-      "starting_value": 1
-    },
-    "class_type": "IntControl",
-    "_meta": {
-      "title": "Int Control (RyanOnTheInside)"
-    }
-  },
   "227": {
     "inputs": {
       "x": 0,
@@ -37,7 +23,7 @@
         0
       ],
       "mask": [
-        "234",
+        "237",
         0
       ]
     },
@@ -58,20 +44,6 @@
       "title": "EmptyImage"
     }
   },
-  "231": {
-    "inputs": {
-      "steps_per_cycle": 29,
-      "movement_type": "sine_wave",
-      "always_execute": true,
-      "maximum_value": 502,
-      "minimum_value": 1,
-      "starting_value": 474
-    },
-    "class_type": "IntControl",
-    "_meta": {
-      "title": "Int Control (RyanOnTheInside)"
-    }
-  },
   "233": {
     "inputs": {
       "filename_prefix": "ComfyUI",
@@ -85,15 +57,43 @@
       "title": "Save Image"
     }
   },
-  "234": {
+  "235": {
+    "inputs": {
+      "always_execute": true,
+      "steps_per_cycle": 30,
+      "movement_type": "sine",
+      "maximum_value": 100,
+      "minimum_value": 0,
+      "starting_value": 50
+    },
+    "class_type": "IntControl",
+    "_meta": {
+      "title": "Int Control (RyanOnTheInside)"
+    }
+  },
+  "236": {
+    "inputs": {
+      "always_execute": true,
+      "steps_per_cycle": 30,
+      "movement_type": "sine",
+      "maximum_value": 100,
+      "minimum_value": 0,
+      "starting_value": 50
+    },
+    "class_type": "IntControl",
+    "_meta": {
+      "title": "Int Control (RyanOnTheInside)"
+    }
+  },
+  "237": {
     "inputs": {
       "shape": "circle",
       "width": [
-        "224",
+        "235",
         0
       ],
       "height": [
-        "231",
+        "236",
         0
       ],
       "x": 256,
@@ -104,7 +104,7 @@
     },
     "class_type": "QuickShapeMask",
     "_meta": {
-      "title": "QuickShapeMask"
+      "title": "Quick Shape Mask (RyanOnTheInside)"
     }
   }
 }
