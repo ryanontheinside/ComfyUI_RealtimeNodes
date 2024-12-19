@@ -2,6 +2,7 @@
 
 Simple control nodes that generate changing values over separate executions of a workflow. Each time the workflow is executed, the value will be updated. This is useful for animating parameters in systems like ComfyStream that execute the workflow once per frame frame.
 
+
 ## Nodes
 
 ### FloatControl
@@ -23,3 +24,27 @@ More soon!
 ## Demo
 In this  demo we are controlling the width and height of a shape mask with an Int Control node. Imagine controlling the denoise on a KSampler with a Float Control, though!
 ![Value Control Demo](assets/ValueControl.gif)
+
+
+
+## Installation
+
+### Option 1: ComfyUI Manager (Recommended)
+The easiest way to install is through [ComfyUI Manager](https://github.com/ltdrdata/ComfyUI-Manager):
+1. Install ComfyUI Manager if you haven't already
+2. Open ComfyUI
+3. Navigate to the Manager tab
+4. Search for "Control Nodes"
+5. Click Install
+
+### Option 2: Manual Installation
+1. Clone this repository into your ComfyUI custom_nodes folder:
+```bash
+cd ComfyUI/custom_nodes
+git clone https://github.com/your-repo/comfyui-control-nodes.git
+```
+
+2. Install the required dependencies:
+```bash
+pip install -r requirements.txt
+```
