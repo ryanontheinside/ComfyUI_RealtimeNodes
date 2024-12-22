@@ -1,6 +1,6 @@
 # ComfyUI Control Nodes
 
-Simple control nodes that generate changing values over separate executions of a workflow. Each time the workflow is executed, the value will be updated. This is useful for animating parameters in systems like [ComfyStream](https://github.com/yondonfu/comfystream) that execute the workflow once per frame.
+Control nodes that generate changing values over separate executions of a workflow. Each time the workflow is executed, the value will be updated. This is useful for animating parameters in systems like [ComfyStream](https://github.com/yondonfu/comfystream) that execute the workflow once per frame.
 
 ## Nodes
 
@@ -30,10 +30,8 @@ Sequence controls allow you to specify exact values to cycle through. You can co
 ### FPS Monitor
 Outputs an image and mask showing current and average FPS. Useful for performance monitoring in real-time workflows.
 
-IMPORTANT: Be sure to set viable minimum and maximum values according to the node you are animating.
-
 ## Demo
-In this demo we are controlling the width and height of a shape mask with an Int Control node. Imagine controlling the denoise on a KSampler with a Float Control, though!
+In this demo we are controlling the width and height of a shape mask with an Int Control node. Imagine controlling the denoise on a KSampler with a Float Control, though! Or CFG in StreamDiffusion!
 ![Value Control Demo](assets/ValueControl.gif)
 
 ## Installation
