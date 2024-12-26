@@ -2,6 +2,7 @@ from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
 from .controls.utility_controls import FPSMonitor
 from .quick_shape_mask import QuickShapeMask
+from .tiny_vae import TAESDVaeEncode, TAESDVaeDecode
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -11,9 +12,11 @@ NODE_CLASS_MAPPINGS = {
     "IntSequence": IntSequence,
     "StringSequence": StringSequence,
     "FPSMonitor": FPSMonitor,
-    #"IntervalControl": IntervalControl,
+    #"IntervalControl": IntervalCo  ntrol,
     #"DeltaControl": DeltaControl,
-    "QuickShapeMask": QuickShapeMask
+    "QuickShapeMask": QuickShapeMask,
+    "TAESDVaeEncode": TAESDVaeEncode,
+    "TAESDVaeDecode": TAESDVaeDecode
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -26,7 +29,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FPSMonitor": "FPS Monitor (RyanOnTheInside)",
     #"IntervalControl": "Interval Control (RyanOnTheInside)",
     #"DeltaControl": "Delta Control (RyanOnTheInside)",
-    "QuickShapeMask": "Quick Shape Mask (RyanOnTheInside)"
+    "QuickShapeMask": "Quick Shape Mask (RyanOnTheInside)",
+    "TAESDVaeEncode": "TAESD VAE Encode (RyanOnTheInside)",
+    "TAESDVaeDecode": "TAESD VAE Decode (RyanOnTheInside)"
 }
 
 WEB_DIRECTORY = "./web/js"
