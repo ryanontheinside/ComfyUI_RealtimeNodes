@@ -3,6 +3,7 @@ from .controls.sequence_controls import FloatSequence, IntSequence, StringSequen
 from .controls.utility_controls import FPSMonitor
 from .quick_shape_mask import QuickShapeMask
 from .tiny_vae import TAESDVaeEncode, TAESDVaeDecode
+from .misc_nodes import DTypeConverter
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -16,7 +17,8 @@ NODE_CLASS_MAPPINGS = {
     #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
     "TAESDVaeEncode": TAESDVaeEncode,
-    "TAESDVaeDecode": TAESDVaeDecode
+    "TAESDVaeDecode": TAESDVaeDecode,
+    "DTypeConverter": DTypeConverter
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -31,7 +33,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     #"DeltaControl": "Delta Control (RyanOnTheInside)",
     "QuickShapeMask": "Quick Shape Mask (RyanOnTheInside)",
     "TAESDVaeEncode": "TAESD VAE Encode (RyanOnTheInside)",
-    "TAESDVaeDecode": "TAESD VAE Decode (RyanOnTheInside)"
+    "TAESDVaeDecode": "TAESD VAE Decode (RyanOnTheInside)",
+    "DTypeConverter": "DType Converter (RyanOnTheInside)"
 }
 
 WEB_DIRECTORY = "./web/js"
