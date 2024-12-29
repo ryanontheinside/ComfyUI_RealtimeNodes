@@ -1,6 +1,7 @@
 from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
 from .controls.utility_controls import FPSMonitor
+from .controls.motion_controls import MotionController, ROINode
 from .quick_shape_mask import QuickShapeMask
 from .tiny_vae import TAESDVaeEncode, TAESDVaeDecode
 from .misc_nodes import DTypeConverter
@@ -13,6 +14,8 @@ NODE_CLASS_MAPPINGS = {
     "IntSequence": IntSequence,
     "StringSequence": StringSequence,
     "FPSMonitor": FPSMonitor,
+    "MotionController": MotionController,
+    "ROINode": ROINode,
     #"IntervalControl": IntervalCo  ntrol,
     #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
@@ -29,6 +32,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IntSequence": "Int Sequence (RyanOnTheInside)",
     "StringSequence": "String Sequence (RyanOnTheInside)",
     "FPSMonitor": "FPS Monitor (RyanOnTheInside)",
+    "MotionController": "Motion Controller (RyanOnTheInside)",
+    "ROINode": "ROI Node (RyanOnTheInside)",
     #"IntervalControl": "Interval Control (RyanOnTheInside)",
     #"DeltaControl": "Delta Control (RyanOnTheInside)",
     "QuickShapeMask": "Quick Shape Mask (RyanOnTheInside)",
