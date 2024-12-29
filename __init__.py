@@ -1,7 +1,8 @@
 from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
 from .controls.utility_controls import FPSMonitor
-from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
+from .controls.detector_controls import IntDetectionControl,FloatDetectionControl,StringDetectionControl
+from .detectors.detector_nodes import MotionDetectorNode, RegionOfInterest, BrightnessDetectorNode
 from .quick_shape_mask import QuickShapeMask
 from .tiny_vae import TAESDVaeEncode, TAESDVaeDecode
 from .misc_nodes import DTypeConverter
@@ -10,16 +11,23 @@ NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
     "IntControl": IntControl,
     "StringControl": StringControl,
+    
+    
     "FloatSequence": FloatSequence,
     "IntSequence": IntSequence,
     "StringSequence": StringSequence,
+    
     "FPSMonitor": FPSMonitor,
-    "MotionController": MotionController,
-    "IntegerMotionController": IntegerMotionController,
-    "ROINode": ROINode,
-    #"IntervalControl": IntervalCo  ntrol,
-    #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
+
+    "MotionDetectorNode": MotionDetectorNode,
+    "BrightnessDetectorNode": BrightnessDetectorNode,
+    "RegionOfInterest": RegionOfInterest,
+    "IntDetectionControl": IntDetectionControl,
+    "FloatDetectionControl": FloatDetectionControl,
+    "StringDetectionControl": StringDetectionControl,
+    
+    
     "TAESDVaeEncode": TAESDVaeEncode,
     "TAESDVaeDecode": TAESDVaeDecode,
     "DTypeConverter": DTypeConverter
@@ -33,11 +41,12 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IntSequence": "Int Sequence (RyanOnTheInside)",
     "StringSequence": "String Sequence (RyanOnTheInside)",
     "FPSMonitor": "FPS Monitor (RyanOnTheInside)",
-    "MotionController": "Float Motion Controller (RyanOnTheInside)",
-    "ROINode": "ROI Node (RyanOnTheInside)",
-    "IntegerMotionController": "Integer Motion Controller (RyanOnTheInside)",
-    #"IntervalControl": "Interval Control (RyanOnTheInside)",
-    #"DeltaControl": "Delta Control (RyanOnTheInside)",
+    "MotionDetectorNode": "Motion Detector (RyanOnTheInside)",
+    "BrightnessDetectorNode": "Brightness Detector (RyanOnTheInside)",
+    "RegionOfInterest": "Region of Interest (RyanOnTheInside)",
+    "IntDetectionControl": "Detector Int Control (RyanOnTheInside)",
+    "FloatDetectionControl": "Detector Float Control (RyanOnTheInside)",
+    "StringDetectionControl": "Detector String Control (RyanOnTheInside)",
     "QuickShapeMask": "Quick Shape Mask (RyanOnTheInside)",
     "TAESDVaeEncode": "TAESD VAE Encode (RyanOnTheInside)",
     "TAESDVaeDecode": "TAESD VAE Decode (RyanOnTheInside)",
