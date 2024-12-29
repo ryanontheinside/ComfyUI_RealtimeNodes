@@ -29,6 +29,7 @@ class ROINode(ControlNodeBase):
                 "action": (list(action.value for action in ROIAction),),
                 "value": ("FLOAT", {
                     "default": 0.1,
+                    "step": 0.01,
                     "tooltip": "Value to use for mathematical operations"
                 }),
             },
@@ -61,6 +62,9 @@ class ROINode(ControlNodeBase):
             "next": next_roi
         }
         return (roi_data,)
+
+    def update(self, *args, **kwargs):
+        return self.define_roi(*args, **kwargs)
 
 class MotionController(ControlNodeBase):
     """Processes motion detection for a chain of ROIs and manages their states"""
@@ -210,3 +214,71 @@ class MotionController(ControlNodeBase):
         mask_tensor = torch.from_numpy(motion_mask).unsqueeze(0)
         
         return (state["current_value"], mask_tensor) 
+
+    def update(self, *args, **kwargs):
+        return self.process_motion(*args, **kwargs) 
+
+class RoundingMode(Enum):
+    ROUND = "round"    # Standard rounding
+    FLOOR = "floor"    # Round down
+    CEIL = "ceil"      # Round up
+    TRUNCATE = "truncate"  # Remove decimal part
+
+class IntegerMotionController(MotionController):
+    """Processes motion detection for ROIs and outputs integer values"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        inputs = super().INPUT_TYPES()
+        # Convert float parameters to int
+        inputs["required"]["minimum_value"] = ("INT", {
+            "default": 0,
+            "tooltip": "Minimum output value"
+        })
+        inputs["required"]["maximum_value"] = ("INT", {
+            "default": 100,
+            "tooltip": "Maximum output value"
+        })
+        inputs["required"]["starting_value"] = ("INT", {
+            "default": 0,
+            "tooltip": "Initial output value"
+        })
+        # Add rounding mode parameter
+        inputs["required"]["rounding_mode"] = (
+            [mode.value for mode in RoundingMode],
+            {"default": RoundingMode.ROUND.value}
+        )
+        return inputs
+
+    RETURN_TYPES = ("INT", "MASK")
+    FUNCTION = "process_motion"
+    CATEGORY = "real-time/control/motion"
+
+    def _apply_rounding(self, value, mode):
+        """Apply the specified rounding mode to convert float to int"""
+        if mode == RoundingMode.ROUND.value:
+            return int(round(value))
+        elif mode == RoundingMode.FLOOR.value:
+            return int(np.floor(value))
+        elif mode == RoundingMode.CEIL.value:
+            return int(np.ceil(value))
+        else:  # TRUNCATE
+            return int(value)
+
+    def process_motion(self, image, roi_chain, threshold, blur_size,
+                      minimum_value, maximum_value, starting_value, 
+                      rounding_mode, always_execute=True):
+        # Call parent class method with float conversion of bounds
+        float_result, mask = super().process_motion(
+            image, roi_chain, threshold, blur_size,
+            float(minimum_value), float(maximum_value), float(starting_value),
+            always_execute
+        )
+        
+        # Convert result to integer using specified rounding mode
+        int_result = self._apply_rounding(float_result, rounding_mode)
+        
+        # Ensure result stays within bounds
+        int_result = max(minimum_value, min(maximum_value, int_result))
+        
+        return (int_result, mask) 
