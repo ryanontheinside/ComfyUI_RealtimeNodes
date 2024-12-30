@@ -8,14 +8,33 @@ class RegionOfInterest(ControlNodeBase):
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()  # Get base inputs
-        inputs["required"].update({  # Update with additional inputs
-            "mask": ("MASK",),
-            "detector": ("DETECTOR",),  # Takes configured detector node output 
-            "action": (list(action.value for action in ROIAction),),
-            "value": ("FLOAT", {"default": 0.1, "step": 0.01}),
+        
+        # Format tooltip using ROIAction descriptions
+        action_tooltip = "Available actions:\n" + "\n".join(
+            f"• {action.value}: {ROIAction.descriptions[action.value]}" 
+            for action in ROIAction
+        )
+        
+        inputs["required"].update({
+            "mask": ("MASK", {
+                "tooltip": "Binary mask defining the region of interest"
+            }),
+            "detector": ("DETECTOR", {
+                "tooltip": "Configured detector node (Motion or Brightness) to process this region"
+            }),
+            "action": (list(action.value for action in ROIAction), {
+                "tooltip": action_tooltip
+            }),
+            "value": ("FLOAT", {
+                "default": 0.1,
+                "step": 0.01,
+                "tooltip": "Value to use in the selected action (amount to add/subtract/multiply/divide/set)"
+            }),
         })
-        inputs["optional"] = {  # Add optional inputs
-            "next_roi": ("ROI",)
+        inputs["optional"] = {
+            "next_roi": ("ROI", {
+                "tooltip": "Optional connection to chain multiple ROIs together"
+            })
         }
         return inputs
 
