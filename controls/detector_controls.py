@@ -9,16 +9,12 @@ class DetectionControlBase(ControlNodeBase):
     
     @classmethod
     def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "roi_chain": ("ROI",),
-                "always_execute": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "When enabled, the node updates every execution"
-                })
-            }
-        }
+        inputs = super().INPUT_TYPES()  # Get base inputs including always_execute
+        inputs["required"].update({
+            "image": ("IMAGE",),
+            "roi_chain": ("ROI",),
+        })
+        return inputs
 
     RETURN_TYPES = ("MASK",)
     CATEGORY = "real-time/control/detection"
@@ -74,6 +70,25 @@ class DetectionControlBase(ControlNodeBase):
         # Convert image tensor to numpy
         current_frame = (image[0] * 255).cpu().numpy().astype(np.uint8)
         detection_mask = np.zeros_like(current_frame[:,:,0], dtype=np.float32)
+
+        # Collect all unique detector types from ROI chain
+        detector_types = set()
+        current_roi = roi_chain
+        while current_roi is not None:
+            detector = current_roi["detector"]
+            detector_types.add(detector.__class__)
+            current_roi = current_roi["next"]
+
+        print("Found detector types:", [d.__name__ for d in detector_types])
+        
+        # Run preprocessing for each detector type
+        preprocessed_data = {}
+        for detector_type in detector_types:
+            print(f"Running preprocess for {detector_type.__name__}")
+            if hasattr(detector_type, 'preprocess'):
+                data = detector_type.preprocess(current_frame)
+                print(f"Preprocessed data keys: {list(data.keys())}")
+                preprocessed_data[detector_type] = data
         
         # Process ROI chain
         current_roi = roi_chain
@@ -82,17 +97,28 @@ class DetectionControlBase(ControlNodeBase):
             y_min, x_min, y_max, x_max = bounds
             roi_id = str(bounds)
             
-            # Process detection
+            # Create unique detector state for this ROI
             detector_state = state["detector_states"].setdefault(roi_id, {})
+            detector_state.update({
+                'y_offset': y_min,  # Add ROI coordinates to state
+                'x_offset': x_min
+            })
             roi_state = state["roi_states"].setdefault(roi_id, {
                 "active": False,
                 "count": 0
             })
             
+            # Add preprocessed data to detector state
+            detector_type = current_roi["detector"].__class__
+            if detector_type in preprocessed_data:
+                print(f"\nProcessing ROI {roi_id}")
+                print(f"Found preprocessed data: {list(preprocessed_data[detector_type].keys())}")
+                detector_state["preprocessed"] = preprocessed_data[detector_type]
+            
             detection_value, viz_mask = current_roi["detector"].detect(
                 current_frame[y_min:y_max+1, x_min:x_max+1],
                 current_roi["mask"][y_min:y_max+1, x_min:x_max+1],
-                detector_state
+                detector_state  # Now each ROI has its own state
             )
             
             # Update visualization mask

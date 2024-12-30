@@ -36,8 +36,8 @@ class ControlNodeBase(ABC):
         return {
             "required": {
                 "always_execute": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "When enabled, the node updates every execution"
+                    "default": False,
+                    "tooltip": "When enabled, the node updates every execution. This is primarily for use INSIDE of ComfyUI. Generally, you should set this to FALSE for real-time applications, like ComfyStream."
                 }),
             },
         }
