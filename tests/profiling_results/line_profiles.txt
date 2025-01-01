@@ -1,0 +1,530 @@
+
+================================================================================
+Profile for: core_detection
+================================================================================
+Timer unit: 1e-07 s
+
+Total time: 0.381641 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\base\detector_base.py
+Function: get_shared_data at line 9
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+     9                                               @staticmethod
+    10                                               def get_shared_data(frame: np.ndarray, blur_size: int = 5) -> dict:
+    11                                                   """
+    12                                                   Performs common image processing operations once
+    13                                                   Args:
+    14                                                       frame: RGB numpy array
+    15                                                       blur_size: Size of Gaussian blur kernel
+    16                                                   Returns:
+    17                                                       dict of preprocessed data
+    18                                                   """
+    19      1957    1755233.0    896.9     46.0          gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    20      1957    1945719.0    994.2     51.0          blurred = cv2.GaussianBlur(gray, (blur_size, blur_size), 0)
+    21      1957      49725.0     25.4      1.3          return {
+    22      1957      29456.0     15.1      0.8              "gray": gray,
+    23      1957      17035.0      8.7      0.4              "blurred": blurred,
+    24      1957      19241.0      9.8      0.5              "frame": frame  # Original frame
+    25                                                   }
+
+Total time: 0 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\controls\detector_controls.py
+Function: _process_action at line 34
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    34                                               def _process_action(self, state, action, detection, value, roi_state, min_val, max_val):
+    35                                                   """Process ROI action based on detection"""
+    36                                                   detected = detection > 0.5  # Basic threshold
+    37                                                   
+    38                                                   if detected and not roi_state["active"]:
+    39                                                       roi_state["active"] = True
+    40                                                       
+    41                                                       if action == ROIAction.ADD.value:
+    42                                                           state["current_value"] = min(max_val, state["current_value"] + value)
+    43                                                       elif action == ROIAction.SUBTRACT.value:
+    44                                                           state["current_value"] = max(min_val, state["current_value"] - value)
+    45                                                       elif action == ROIAction.MULTIPLY.value:
+    46                                                           state["current_value"] = min(max_val, state["current_value"] * value)
+    47                                                       elif action == ROIAction.DIVIDE.value:
+    48                                                           if value != 0:
+    49                                                               state["current_value"] = max(min_val, state["current_value"] / value)
+    50                                                       elif action == ROIAction.SET.value:
+    51                                                           state["current_value"] = max(min_val, min(max_val, value))
+    52                                                       elif action == ROIAction.TOGGLE.value:
+    53                                                           state["current_value"] = max_val if state["current_value"] == min_val else min_val
+    54                                                       elif action == ROIAction.TRIGGER.value:
+    55                                                           state["current_value"] = max_val
+    56                                                       elif action == ROIAction.COUNTER.value:
+    57                                                           roi_state["count"] += 1
+    58                                                           state["current_value"] = min_val + (
+    59                                                               roi_state["count"] % (int((max_val - min_val) + 1))
+    60                                                           )
+    61                                                   
+    62                                                   elif action == ROIAction.MOMENTARY.value:
+    63                                                       state["current_value"] = max_val if detected else min_val
+    64                                                   
+    65                                                   elif not detected:
+    66                                                       roi_state["active"] = False
+    67                                                       if action == ROIAction.TRIGGER.value:
+    68                                                           state["current_value"] = min_val
+
+Total time: 0 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\controls\detector_controls.py
+Function: process_detection_base at line 70
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    70                                               def process_detection_base(self, image, roi_chain, minimum_value, maximum_value, starting_value, always_execute=True):
+    71                                                   state = self.get_state({
+    72                                                       "current_value": starting_value,
+    73                                                       "detector_states": {},
+    74                                                       "roi_states": {},
+    75                                                       "last_cleanup": time.time()
+    76                                                   })
+    77                                                   
+    78                                                   # Convert image tensor to numpy
+    79                                                   current_frame = (image[0] * 255).cpu().numpy().astype(np.uint8)
+    80                                                   detection_mask = np.zeros_like(current_frame[:,:,0], dtype=np.float32)
+    81                                           
+    82                                                   # Generate shared preprocessed data once
+    83                                                   shared_data = SharedProcessing.get_shared_data(current_frame)
+    84                                                   
+    85                                                   # Collect all unique detector types from ROI chain
+    86                                                   detector_types = set()
+    87                                                   current_roi = roi_chain
+    88                                                   while current_roi is not None:
+    89                                                       detector = current_roi["detector"]
+    90                                                       detector_types.add(detector.__class__)
+    91                                                       current_roi = current_roi["next"]
+    92                                                   
+    93                                                   # Run preprocessing for each detector type
+    94                                                   preprocessed_data = {}
+    95                                                   for detector_type in detector_types:
+    96                                                       if hasattr(detector_type, 'preprocess'):
+    97                                                           preprocessed_data[detector_type] = detector_type.preprocess(current_frame, shared_data)
+    98                                                   
+    99                                                   # Process ROI chain
+   100                                                   current_roi = roi_chain
+   101                                                   while current_roi is not None:
+   102                                                       bounds = current_roi["bounds"]
+   103                                                       y_min, x_min, y_max, x_max = bounds
+   104                                                       roi_id = str(bounds)
+   105                                                       
+   106                                                       # Get detector state
+   107                                                       detector_state = state["detector_states"].setdefault(roi_id, {})
+   108                                                       detector_state.update({
+   109                                                           'y_offset': y_min,
+   110                                                           'x_offset': x_min,
+   111                                                           'shared': shared_data  # Add shared data
+   112                                                       })
+   113                                                       
+   114                                                       # Add preprocessed data if available
+   115                                                       detector_type = current_roi["detector"].__class__
+   116                                                       if detector_type in preprocessed_data:
+   117                                                           detector_state["preprocessed"] = preprocessed_data[detector_type]
+   118                                                       
+   119                                                       # Get ROI state
+   120                                                       roi_state = state["roi_states"].setdefault(roi_id, {
+   121                                                           "active": False,
+   122                                                           "count": 0
+   123                                                       })
+   124                                                       
+   125                                                       # Run detection
+   126                                                       detection_value, viz_mask = current_roi["detector"].detect(
+   127                                                           current_frame[y_min:y_max+1, x_min:x_max+1],
+   128                                                           current_roi["mask"][y_min:y_max+1, x_min:x_max+1],
+   129                                                           detector_state
+   130                                                       )
+   131                                                       
+   132                                                       # Update visualization mask
+   133                                                       detection_mask[y_min:y_max+1, x_min:x_max+1] = np.maximum(
+   134                                                           detection_mask[y_min:y_max+1, x_min:x_max+1],
+   135                                                           viz_mask
+   136                                                       )
+   137                                                       
+   138                                                       # Process action
+   139                                                       self._process_action(
+   140                                                           state, current_roi["action"],
+   141                                                           detection_value, current_roi["value"],
+   142                                                           roi_state, minimum_value, maximum_value
+   143                                                       )
+   144                                                       
+   145                                                       current_roi = current_roi["next"]
+   146                                                   
+   147                                                   self.set_state(state)
+   148                                                   return state["current_value"], torch.from_numpy(detection_mask).unsqueeze(0)
+
+Total time: 0 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\detectors\detector_nodes.py
+Function: update at line 53
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    53                                               def update(self, mask, detector, action, value, always_execute=False, next_roi=None):
+    54                                                   """Implements required update method from ControlNodeBase"""
+    55                                                   mask_np = mask[0].cpu().numpy()
+    56                                                   
+    57                                                   # Calculate bounds
+    58                                                   coords = np.nonzero(mask_np)
+    59                                                   bounds = (
+    60                                                       coords[0].min() if len(coords[0]) > 0 else 0,
+    61                                                       coords[1].min() if len(coords[0]) > 0 else 0,
+    62                                                       coords[0].max() if len(coords[0]) > 0 else 0,
+    63                                                       coords[1].max() if len(coords[0]) > 0 else 0
+    64                                                   )
+    65                                                   
+    66                                                   return ({
+    67                                                       "mask": mask_np,
+    68                                                       "bounds": bounds,
+    69                                                       "detector": detector,  # Now takes pre-configured detector
+    70                                                       "action": action,
+    71                                                       "value": value,
+    72                                                       "next": next_roi
+    73                                                   },)
+
+Total time: 0.183051 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\detectors\detectors.py
+Function: detect at line 27
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    27                                               def detect(self, current_frame: np.ndarray, mask: np.ndarray, state: dict) -> tuple[float, np.ndarray]:
+    28                                                   # Get preprocessed data
+    29       957      46330.0     48.4      2.5          preprocessed = state.get("preprocessed", {})
+    30       957      18885.0     19.7      1.0          shared = state.get("shared", {})
+    31       957      19160.0     20.0      1.0          y_offset = state.get('y_offset', 0)
+    32       957      18292.0     19.1      1.0          x_offset = state.get('x_offset', 0)
+    33                                                   
+    34                                                   # Get the blurred ROI from preprocessed data
+    35       957      10053.0     10.5      0.5          full_blurred = preprocessed["blurred"]
+    36                                                   # Extract the correct ROI region from the full blurred image
+    37      1914     107667.0     56.3      5.9          current_blurred = full_blurred[y_offset:y_offset+current_frame.shape[0], 
+    38       957      35580.0     37.2      1.9                                       x_offset:x_offset+current_frame.shape[1]]
+    39                                                   
+    40                                                   # Initialize or update previous frame for this ROI
+    41       957      68429.0     71.5      3.7          roi_key = f"{y_offset},{x_offset}"
+    42       957      15278.0     16.0      0.8          if "prev_blurred" not in state:
+    43       957      14930.0     15.6      0.8              state["prev_blurred"] = {}
+    44       957      13225.0     13.8      0.7          if roi_key not in state["prev_blurred"]:
+    45       957       9693.0     10.1      0.5              state["prev_blurred"][roi_key] = current_blurred
+    46       957    1452990.0   1518.3     79.4              return 0.0, np.zeros_like(current_blurred, dtype=np.float32)
+    47                                                       
+    48                                                   # Calculate frame difference
+    49                                                   diff = cv2.absdiff(current_blurred, state["prev_blurred"][roi_key])
+    50                                                   _, thresh = cv2.threshold(diff, self.threshold * 255, 255, cv2.THRESH_BINARY)
+    51                                                   
+    52                                                   # Apply ROI mask
+    53                                                   thresh = thresh * (mask > 0.5)
+    54                                                   
+    55                                                   # Update previous frame
+    56                                                   state["prev_blurred"][roi_key] = current_blurred.copy()
+    57                                                   
+    58                                                   # Calculate motion magnitude
+    59                                                   roi_area = np.sum(mask > 0.5)
+    60                                                   if roi_area > 0:
+    61                                                       motion_magnitude = np.sum(thresh) / (255.0 * roi_area)
+    62                                                   else:
+    63                                                       motion_magnitude = 0.0
+    64                                                       
+    65                                                   return motion_magnitude, thresh.astype(np.float32) / 255.0
+
+Total time: 1.1941 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\detectors\detectors.py
+Function: detect at line 79
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    79                                               def detect(self, current_frame: np.ndarray, mask: np.ndarray, state: dict) -> tuple[float, np.ndarray]:
+    80                                                   # Get preprocessed data
+    81      1000      38993.0     39.0      0.3          preprocessed = state.get("preprocessed", {})
+    82      1000      20094.0     20.1      0.2          shared = state.get("shared", {})
+    83      1000      18118.0     18.1      0.2          y_offset = state.get('y_offset', 0)
+    84      1000      19591.0     19.6      0.2          x_offset = state.get('x_offset', 0)
+    85                                                   
+    86                                                   # Get the grayscale ROI from preprocessed data
+    87      1000       9176.0      9.2      0.1          full_gray = preprocessed["gray"]
+    88                                                   # Extract the correct ROI region from the full grayscale image
+    89      2000     114829.0     57.4      1.0          gray = full_gray[y_offset:y_offset+current_frame.shape[0], 
+    90      1000      40069.0     40.1      0.3                          x_offset:x_offset+current_frame.shape[1]]
+    91                                                   
+    92                                                   # Apply mask
+    93      1000    4935322.0   4935.3     41.3          masked_gray = gray * (mask > 0.5)
+    94                                                   
+    95                                                   # Calculate brightness
+    96      1000      19178.0     19.2      0.2          if self.use_average:
+    97      1000    3213790.0   3213.8     26.9              brightness = np.mean(masked_gray) / 255.0
+    98                                                   else:
+    99                                                       brightness = np.max(masked_gray) / 255.0
+   100                                                       
+   101                                                   # Create visualization
+   102      1000    3501365.0   3501.4     29.3          viz_mask = (masked_gray > (self.threshold * 255)).astype(np.float32)
+   103                                                   
+   104      1000      10493.0     10.5      0.1          return brightness, viz_mask
+
+
+================================================================================
+Profile for: detector_nodes
+================================================================================
+Timer unit: 1e-07 s
+
+Total time: 0.694158 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\base\detector_base.py
+Function: get_shared_data at line 9
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+     9                                               @staticmethod
+    10                                               def get_shared_data(frame: np.ndarray, blur_size: int = 5) -> dict:
+    11                                                   """
+    12                                                   Performs common image processing operations once
+    13                                                   Args:
+    14                                                       frame: RGB numpy array
+    15                                                       blur_size: Size of Gaussian blur kernel
+    16                                                   Returns:
+    17                                                       dict of preprocessed data
+    18                                                   """
+    19      2957    3539730.0   1197.1     51.0          gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    20      2957    3221625.0   1089.5     46.4          blurred = cv2.GaussianBlur(gray, (blur_size, blur_size), 0)
+    21      2957      78760.0     26.6      1.1          return {
+    22      2957      45669.0     15.4      0.7              "gray": gray,
+    23      2957      26064.0      8.8      0.4              "blurred": blurred,
+    24      2957      29730.0     10.1      0.4              "frame": frame  # Original frame
+    25                                                   }
+
+Total time: 0.0349178 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\controls\detector_controls.py
+Function: _process_action at line 34
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    34                                               def _process_action(self, state, action, detection, value, roi_state, min_val, max_val):
+    35                                                   """Process ROI action based on detection"""
+    36      1000      29667.0     29.7      8.5          detected = detection > 0.5  # Basic threshold
+    37                                                   
+    38      1000      18221.0     18.2      5.2          if detected and not roi_state["active"]:
+    39                                                       roi_state["active"] = True
+    40                                                       
+    41                                                       if action == ROIAction.ADD.value:
+    42                                                           state["current_value"] = min(max_val, state["current_value"] + value)
+    43                                                       elif action == ROIAction.SUBTRACT.value:
+    44                                                           state["current_value"] = max(min_val, state["current_value"] - value)
+    45                                                       elif action == ROIAction.MULTIPLY.value:
+    46                                                           state["current_value"] = min(max_val, state["current_value"] * value)
+    47                                                       elif action == ROIAction.DIVIDE.value:
+    48                                                           if value != 0:
+    49                                                               state["current_value"] = max(min_val, state["current_value"] / value)
+    50                                                       elif action == ROIAction.SET.value:
+    51                                                           state["current_value"] = max(min_val, min(max_val, value))
+    52                                                       elif action == ROIAction.TOGGLE.value:
+    53                                                           state["current_value"] = max_val if state["current_value"] == min_val else min_val
+    54                                                       elif action == ROIAction.TRIGGER.value:
+    55                                                           state["current_value"] = max_val
+    56                                                       elif action == ROIAction.COUNTER.value:
+    57                                                           roi_state["count"] += 1
+    58                                                           state["current_value"] = min_val + (
+    59                                                               roi_state["count"] % (int((max_val - min_val) + 1))
+    60                                                           )
+    61                                                   
+    62      1000     200182.0    200.2     57.3          elif action == ROIAction.MOMENTARY.value:
+    63                                                       state["current_value"] = max_val if detected else min_val
+    64                                                   
+    65      1000      11266.0     11.3      3.2          elif not detected:
+    66      1000      19421.0     19.4      5.6              roi_state["active"] = False
+    67      1000      70421.0     70.4     20.2              if action == ROIAction.TRIGGER.value:
+    68                                                           state["current_value"] = min_val
+
+Total time: 4.51688 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\controls\detector_controls.py
+Function: process_detection_base at line 70
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    70                                               def process_detection_base(self, image, roi_chain, minimum_value, maximum_value, starting_value, always_execute=True):
+    71      2000     116318.0     58.2      0.3          state = self.get_state({
+    72      1000       8178.0      8.2      0.0              "current_value": starting_value,
+    73      1000       7166.0      7.2      0.0              "detector_states": {},
+    74      1000       7387.0      7.4      0.0              "roi_states": {},
+    75      1000      36682.0     36.7      0.1              "last_cleanup": time.time()
+    76                                                   })
+    77                                                   
+    78                                                   # Convert image tensor to numpy
+    79      1000   13986604.0  13986.6     31.0          current_frame = (image[0] * 255).cpu().numpy().astype(np.uint8)
+    80      1000    1790358.0   1790.4      4.0          detection_mask = np.zeros_like(current_frame[:,:,0], dtype=np.float32)
+    81                                           
+    82                                                   # Generate shared preprocessed data once
+    83      1000    3352406.0   3352.4      7.4          shared_data = SharedProcessing.get_shared_data(current_frame)
+    84                                                   
+    85                                                   # Collect all unique detector types from ROI chain
+    86      1000      48927.0     48.9      0.1          detector_types = set()
+    87      1000      11438.0     11.4      0.0          current_roi = roi_chain
+    88      2000      24537.0     12.3      0.1          while current_roi is not None:
+    89      1000      25284.0     25.3      0.1              detector = current_roi["detector"]
+    90      1000      67723.0     67.7      0.1              detector_types.add(detector.__class__)
+    91      1000      14054.0     14.1      0.0              current_roi = current_roi["next"]
+    92                                                   
+    93                                                   # Run preprocessing for each detector type
+    94      1000      12765.0     12.8      0.0          preprocessed_data = {}
+    95      2000      47386.0     23.7      0.1          for detector_type in detector_types:
+    96      1000      56809.0     56.8      0.1              if hasattr(detector_type, 'preprocess'):
+    97      1000     102395.0    102.4      0.2                  preprocessed_data[detector_type] = detector_type.preprocess(current_frame, shared_data)
+    98                                                   
+    99                                                   # Process ROI chain
+   100      1000       9829.0      9.8      0.0          current_roi = roi_chain
+   101      2000      21847.0     10.9      0.0          while current_roi is not None:
+   102      1000      10306.0     10.3      0.0              bounds = current_roi["bounds"]
+   103      1000      35372.0     35.4      0.1              y_min, x_min, y_max, x_max = bounds
+   104      1000     219744.0    219.7      0.5              roi_id = str(bounds)
+   105                                                       
+   106                                                       # Get detector state
+   107      1000      58762.0     58.8      0.1              detector_state = state["detector_states"].setdefault(roi_id, {})
+   108      2000     118886.0     59.4      0.3              detector_state.update({
+   109      1000       9746.0      9.7      0.0                  'y_offset': y_min,
+   110      1000       8943.0      8.9      0.0                  'x_offset': x_min,
+   111      1000       6950.0      7.0      0.0                  'shared': shared_data  # Add shared data
+   112                                                       })
+   113                                                       
+   114                                                       # Add preprocessed data if available
+   115      1000      13930.0     13.9      0.0              detector_type = current_roi["detector"].__class__
+   116      1000      17638.0     17.6      0.0              if detector_type in preprocessed_data:
+   117      1000      28680.0     28.7      0.1                  detector_state["preprocessed"] = preprocessed_data[detector_type]
+   118                                                       
+   119                                                       # Get ROI state
+   120      2000      45371.0     22.7      0.1              roi_state = state["roi_states"].setdefault(roi_id, {
+   121      1000       9541.0      9.5      0.0                  "active": False,
+   122      1000       6729.0      6.7      0.0                  "count": 0
+   123                                                       })
+   124                                                       
+   125                                                       # Run detection
+   126      2000   20698587.0  10349.3     45.8              detection_value, viz_mask = current_roi["detector"].detect(
+   127      1000     125342.0    125.3      0.3                  current_frame[y_min:y_max+1, x_min:x_max+1],
+   128      1000      69127.0     69.1      0.2                  current_roi["mask"][y_min:y_max+1, x_min:x_max+1],
+   129      1000       7232.0      7.2      0.0                  detector_state
+   130                                                       )
+   131                                                       
+   132                                                       # Update visualization mask
+   133      2000    2367583.0   1183.8      5.2              detection_mask[y_min:y_max+1, x_min:x_max+1] = np.maximum(
+   134      1000     142235.0    142.2      0.3                  detection_mask[y_min:y_max+1, x_min:x_max+1],
+   135      1000       6031.0      6.0      0.0                  viz_mask
+   136                                                       )
+   137                                                       
+   138                                                       # Process action
+   139      2000     524381.0    262.2      1.2              self._process_action(
+   140      1000      20220.0     20.2      0.0                  state, current_roi["action"],
+   141      1000      14632.0     14.6      0.0                  detection_value, current_roi["value"],
+   142      1000      10464.0     10.5      0.0                  roi_state, minimum_value, maximum_value
+   143                                                       )
+   144                                                       
+   145      1000      14161.0     14.2      0.0              current_roi = current_roi["next"]
+   146                                                   
+   147      1000     107015.0    107.0      0.2          self.set_state(state)
+   148      1000     723101.0    723.1      1.6          return state["current_value"], torch.from_numpy(detection_mask).unsqueeze(0)
+
+Total time: 0 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\detectors\detector_nodes.py
+Function: update at line 53
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    53                                               def update(self, mask, detector, action, value, always_execute=False, next_roi=None):
+    54                                                   """Implements required update method from ControlNodeBase"""
+    55                                                   mask_np = mask[0].cpu().numpy()
+    56                                                   
+    57                                                   # Calculate bounds
+    58                                                   coords = np.nonzero(mask_np)
+    59                                                   bounds = (
+    60                                                       coords[0].min() if len(coords[0]) > 0 else 0,
+    61                                                       coords[1].min() if len(coords[0]) > 0 else 0,
+    62                                                       coords[0].max() if len(coords[0]) > 0 else 0,
+    63                                                       coords[1].max() if len(coords[0]) > 0 else 0
+    64                                                   )
+    65                                                   
+    66                                                   return ({
+    67                                                       "mask": mask_np,
+    68                                                       "bounds": bounds,
+    69                                                       "detector": detector,  # Now takes pre-configured detector
+    70                                                       "action": action,
+    71                                                       "value": value,
+    72                                                       "next": next_roi
+    73                                                   },)
+
+Total time: 2.19848 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\detectors\detectors.py
+Function: detect at line 27
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    27                                               def detect(self, current_frame: np.ndarray, mask: np.ndarray, state: dict) -> tuple[float, np.ndarray]:
+    28                                                   # Get preprocessed data
+    29      1957      80826.0     41.3      0.4          preprocessed = state.get("preprocessed", {})
+    30      1957      39671.0     20.3      0.2          shared = state.get("shared", {})
+    31      1957      40719.0     20.8      0.2          y_offset = state.get('y_offset', 0)
+    32      1957      35282.0     18.0      0.2          x_offset = state.get('x_offset', 0)
+    33                                                   
+    34                                                   # Get the blurred ROI from preprocessed data
+    35      1957      20964.0     10.7      0.1          full_blurred = preprocessed["blurred"]
+    36                                                   # Extract the correct ROI region from the full blurred image
+    37      3914     202114.0     51.6      0.9          current_blurred = full_blurred[y_offset:y_offset+current_frame.shape[0], 
+    38      1957      74058.0     37.8      0.3                                       x_offset:x_offset+current_frame.shape[1]]
+    39                                                   
+    40                                                   # Initialize or update previous frame for this ROI
+    41      1957     181658.0     92.8      0.8          roi_key = f"{y_offset},{x_offset}"
+    42      1957      30387.0     15.5      0.1          if "prev_blurred" not in state:
+    43       958      14941.0     15.6      0.1              state["prev_blurred"] = {}
+    44      1957      31696.0     16.2      0.1          if roi_key not in state["prev_blurred"]:
+    45       958       9704.0     10.1      0.0              state["prev_blurred"][roi_key] = current_blurred
+    46       958    1454657.0   1518.4      6.6              return 0.0, np.zeros_like(current_blurred, dtype=np.float32)
+    47                                                       
+    48                                                   # Calculate frame difference
+    49       999     720470.0    721.2      3.3          diff = cv2.absdiff(current_blurred, state["prev_blurred"][roi_key])
+    50       999     416032.0    416.4      1.9          _, thresh = cv2.threshold(diff, self.threshold * 255, 255, cv2.THRESH_BINARY)
+    51                                                   
+    52                                                   # Apply ROI mask
+    53       999    6123108.0   6129.2     27.9          thresh = thresh * (mask > 0.5)
+    54                                                   
+    55                                                   # Update previous frame
+    56       999     363534.0    363.9      1.7          state["prev_blurred"][roi_key] = current_blurred.copy()
+    57                                                   
+    58                                                   # Calculate motion magnitude
+    59       999    4457966.0   4462.4     20.3          roi_area = np.sum(mask > 0.5)
+    60       999      30061.0     30.1      0.1          if roi_area > 0:
+    61       999    2418860.0   2421.3     11.0              motion_magnitude = np.sum(thresh) / (255.0 * roi_area)
+    62                                                   else:
+    63                                                       motion_magnitude = 0.0
+    64                                                       
+    65       999    5238051.0   5243.3     23.8          return motion_magnitude, thresh.astype(np.float32) / 255.0
+
+Total time: 1.1941 s
+File: C:\Users\ryanf\Repos\ryanontheinside-github\ComfyUI_RealTimeNodes\detectors\detectors.py
+Function: detect at line 79
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    79                                               def detect(self, current_frame: np.ndarray, mask: np.ndarray, state: dict) -> tuple[float, np.ndarray]:
+    80                                                   # Get preprocessed data
+    81      1000      38993.0     39.0      0.3          preprocessed = state.get("preprocessed", {})
+    82      1000      20094.0     20.1      0.2          shared = state.get("shared", {})
+    83      1000      18118.0     18.1      0.2          y_offset = state.get('y_offset', 0)
+    84      1000      19591.0     19.6      0.2          x_offset = state.get('x_offset', 0)
+    85                                                   
+    86                                                   # Get the grayscale ROI from preprocessed data
+    87      1000       9176.0      9.2      0.1          full_gray = preprocessed["gray"]
+    88                                                   # Extract the correct ROI region from the full grayscale image
+    89      2000     114829.0     57.4      1.0          gray = full_gray[y_offset:y_offset+current_frame.shape[0], 
+    90      1000      40069.0     40.1      0.3                          x_offset:x_offset+current_frame.shape[1]]
+    91                                                   
+    92                                                   # Apply mask
+    93      1000    4935322.0   4935.3     41.3          masked_gray = gray * (mask > 0.5)
+    94                                                   
+    95                                                   # Calculate brightness
+    96      1000      19178.0     19.2      0.2          if self.use_average:
+    97      1000    3213790.0   3213.8     26.9              brightness = np.mean(masked_gray) / 255.0
+    98                                                   else:
+    99                                                       brightness = np.max(masked_gray) / 255.0
+   100                                                       
+   101                                                   # Create visualization
+   102      1000    3501365.0   3501.4     29.3          viz_mask = (masked_gray > (self.threshold * 255)).astype(np.float32)
+   103                                                   
+   104      1000      10493.0     10.5      0.1          return brightness, viz_mask
+

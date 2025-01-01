@@ -1,0 +1,4 @@
+numpy>=1.21.0
+opencv-python>=4.5.0
+line-profiler>=4.0.0
+torch>=2.0.0 

@@ -1,0 +1,44 @@
+{
+  "timing": {
+    "core_detection": {
+      "motion": 0.5376914000371471,
+      "brightness": 1.4816854000091553
+    },
+    "detector_nodes": {
+      "float_control": 4.654838099959306
+    }
+  },
+  "memory": {
+    "core_detection": [
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\tests\\test_profiling.py:255: size=768 KiB, count=3, average=256 KiB",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\tests\\test_profiling.py:238: size=768 KiB, count=3, average=256 KiB",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\base\\detector_base.py:20: size=256 KiB, count=4, average=64.0 KiB",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\base\\detector_base.py:19: size=256 KiB, count=3, average=85.4 KiB",
+      "C:\\Users\\ryanf\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python311\\site-packages\\numpy\\core\\_methods.py:102: size=937 B, count=1, average=937 B",
+      "C:\\Users\\ryanf\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python311\\site-packages\\numpy\\core\\_methods.py:101: size=904 B, count=1, average=904 B",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\detectors\\detectors.py:27: size=840 B, count=1, average=840 B",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\detectors\\detectors.py:79: size=498 B, count=1, average=498 B",
+      "C:\\Users\\ryanf\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python311\\site-packages\\numpy\\core\\_methods.py:69: size=403 B, count=1, average=403 B",
+      "C:\\Users\\ryanf\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python311\\site-packages\\numpy\\core\\_methods.py:67: size=370 B, count=1, average=370 B"
+    ],
+    "detector_nodes": [
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\controls\\detector_controls.py:79: size=768 KiB, count=3, average=256 KiB",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\detectors\\detectors.py:56: size=256 KiB, count=2, average=128 KiB",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\base\\detector_base.py:20: size=256 KiB, count=2, average=128 KiB",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\base\\detector_base.py:19: size=256 KiB, count=2, average=128 KiB",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\controls\\detector_controls.py:70: size=1376 B, count=1, average=1376 B",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\controls\\detector_controls.py:34: size=1020 B, count=1, average=1020 B",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\detectors\\detectors.py:61: size=512 B, count=1, average=512 B",
+      "C:\\Users\\ryanf\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python311\\site-packages\\numpy\\core\\fromnumeric.py:88: size=512 B, count=1, average=512 B",
+      "C:\\Users\\ryanf\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python311\\site-packages\\numpy\\core\\fromnumeric.py:72: size=440 B, count=3, average=147 B",
+      "C:\\Users\\ryanf\\Repos\\ryanontheinside-github\\ComfyUI_RealTimeNodes\\controls\\detector_controls.py:133: size=344 B, count=3, average=115 B"
+    ]
+  },
+  "summary": {
+    "execution": {
+      "total_time": 6.706451892852783,
+      "iterations": 1000,
+      "timestamp": "2025-01-01 11:05:52"
+    }
+  }
+}
