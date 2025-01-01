@@ -1,8 +1,16 @@
-from ..base.control_base import ControlNodeBase
-from ..base.detector_base import ROIAction, SharedProcessing
+import sys
+import os
 import time
 import numpy as np
 import torch
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from base.control_base import ControlNodeBase
+from base.detector_base import ROIAction, SharedProcessing
 
 class DetectionControlBase(ControlNodeBase):
     """Base class for all detection-based controllers"""

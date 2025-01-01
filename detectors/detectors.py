@@ -1,7 +1,15 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import cv2
-from ..base.detector_base import Detector
+import sys
+import os
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from base.detector_base import Detector
 
 class MotionDetector(Detector):
     def setup(self, threshold=0.1, blur_size=5):

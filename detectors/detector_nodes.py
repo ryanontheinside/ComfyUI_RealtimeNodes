@@ -1,8 +1,16 @@
-from .detectors import MotionDetector, BrightnessDetector
-from ..base.control_base import ControlNodeBase
-from ..base.detector_base import ROIAction
+import sys
+import os
 from enum import Enum
 import numpy as np
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from detectors.detectors import MotionDetector, BrightnessDetector
+from base.control_base import ControlNodeBase
+from base.detector_base import ROIAction
 
 class RegionOfInterest(ControlNodeBase):
     @classmethod

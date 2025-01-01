@@ -1,4 +1,13 @@
-from ..base.control_base import ControlNodeBase
+import sys
+import os
+import random
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from base.control_base import ControlNodeBase
 
 class SequenceControlBase(ControlNodeBase):
     """Base class for sequence-based controls"""
