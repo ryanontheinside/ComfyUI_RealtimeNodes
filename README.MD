@@ -48,7 +48,7 @@ In this demo we are controlling the width and height of a shape mask with an Int
 1. Clone this repository into your ComfyUI custom_nodes folder:
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/your-repo/comfyui-control-nodes.git
+git clone https://github.com/ryanontheinside/ComfyUI_RealTimeNodes
 ```
 
 2. Install the required dependencies:
