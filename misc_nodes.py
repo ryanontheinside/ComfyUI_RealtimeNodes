@@ -1,5 +1,15 @@
 import torch
 import comfy.utils
+import numpy as np
+import base64
+import re
+from io import BytesIO
+from PIL import Image
+import nodes
+import random
+from torchvision import transforms
+
+MAX_RESOLUTION = nodes.MAX_RESOLUTION  # Get the same max resolution as core nodes
 
 class AnyType(str):
     def __ne__(self, __value: object) -> bool:
@@ -43,3 +53,51 @@ class DTypeConverter:
                 converted = mask.to(target_dtype)
         
         return (converted,)   
+
+
+class FastWebcamCapture:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("WEBCAM", {}),
+                "width": ("INT", {"default": 640, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
+                "height": ("INT", {"default": 480, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
+                "capture_on_queue": ("BOOLEAN", {"default": True}),
+            }
+        }
+        
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "process_capture"
+    
+    CATEGORY = "image"
+
+    def process_capture(self, image, width, height, capture_on_queue):
+        # Check if we got a data URL
+        if isinstance(image, str) and image.startswith('data:image/'):
+            # Extract the base64 data after the comma
+            base64_data = re.sub('^data:image/.+;base64,', '', image)
+            
+            # Convert base64 to PIL Image
+            buffer = BytesIO(base64.b64decode(base64_data))
+            pil_image = Image.open(buffer).convert("RGB")
+            
+            # Convert PIL to numpy array
+            image = np.array(pil_image)
+            
+            # Handle resize if requested
+            if width > 0 and height > 0:
+                import cv2
+                image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+            
+            # Convert to float32 and normalize to 0-1 range
+            image = image.astype(np.float32) / 255.0
+            
+            # Add batch dimension and convert to torch tensor
+            # ComfyUI expects BHWC format
+            image = torch.from_numpy(image)[None,...]
+            
+            return (image,)
+        else:
+            raise ValueError("Invalid image format received from webcam")
+
