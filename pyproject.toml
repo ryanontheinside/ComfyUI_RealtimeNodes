@@ -1,0 +1,15 @@
+[project]
+name = "comfyui_realtimenodes"
+description = "These nodes are for real-time applications of ComfyUI."
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["opencv-python"]
+
+[project.urls]
+Repository = "https://github.com/ryanontheinside/ComfyUI_RealTimeNodes"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI_RealTimeNodes"
+Icon = ""
