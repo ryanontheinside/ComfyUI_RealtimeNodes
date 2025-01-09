@@ -73,13 +73,13 @@ Example of motion-based active blur effect running in ComfyStream. The action he
 
 ## Installation 💻
 
-### Option 1: ComfyUI Manager (Coming soon!!) 📦
-~~The easiest way to install is through [ComfyUI Manager](https://github.com/ltdrdata/ComfyUI-Manager):~~
-~~1. Install ComfyUI Manager if you haven't already~~
-~~2. Open ComfyUI~~
-~~3. Navigate to the Manager tab~~
-~~4. Search for "Control Nodes"~~
-~~5. Click Install~~
+### Option 1: ComfyUI Manager 📦
+The easiest way to install is through [ComfyUI Manager](https://github.com/ltdrdata/ComfyUI-Manager):
+1. Install ComfyUI Manager if you haven't already
+2. Open ComfyUI
+3. Navigate to the Manager tab
+4. Search for "Control Nodes"
+5. Click Install
 
 ### Option 2: Manual Installation ⚙️
 1. Clone this repository into your ComfyUI custom_nodes folder:
