@@ -4,7 +4,7 @@ from .controls.utility_controls import FPSMonitor
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .quick_shape_mask import QuickShapeMask
 from .tiny_vae import TAESDVaeEncode, TAESDVaeDecode
-from .misc_nodes import DTypeConverter
+from .misc_nodes import DTypeConverter, FastWebcamCapture
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -22,7 +22,8 @@ NODE_CLASS_MAPPINGS = {
     "QuickShapeMask": QuickShapeMask,
     "TAESDVaeEncode": TAESDVaeEncode,
     "TAESDVaeDecode": TAESDVaeDecode,
-    "DTypeConverter": DTypeConverter
+    "DTypeConverter": DTypeConverter,
+    "FastWebcamCapture": FastWebcamCapture,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -41,7 +42,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "QuickShapeMask": "Quick Shape Mask (RyanOnTheInside)",
     "TAESDVaeEncode": "TAESD VAE Encode (RyanOnTheInside)",
     "TAESDVaeDecode": "TAESD VAE Decode (RyanOnTheInside)",
-    "DTypeConverter": "DType Converter (RyanOnTheInside)"
+    "DTypeConverter": "DType Converter (RyanOnTheInside)",
+    "FastWebcamCapture": "Fast Webcam Capture (RyanOnTheInside)",
 }
 
 WEB_DIRECTORY = "./web/js"

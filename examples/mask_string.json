@@ -1,0 +1,89 @@
+{
+  "57": {
+    "inputs": {
+      "image": "dead_inside_512.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage"
+  },
+  "58": {
+    "inputs": {
+      "x": [
+        "62",
+        0
+      ],
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "57",
+        0
+      ],
+      "source": [
+        "59",
+        0
+      ],
+      "mask": [
+        "60",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked"
+  },
+  "59": {
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "batch_size": 1,
+      "color": 0
+    },
+    "class_type": "EmptyImage"
+  },
+  "60": {
+    "inputs": {
+      "value": 1,
+      "width": 512,
+      "height": 512
+    },
+    "class_type": "SolidMask"
+  },
+  "61": {
+    "inputs": {
+      "images": [
+        "58",
+        0
+      ]
+    },
+    "class_type": "PreviewImage"
+  },
+  "62": {
+    "inputs": {
+      "always_execute": true,
+      "steps_per_cycle": 30,
+      "movement_type": "pulse",
+      "maximum_value": 512,
+      "minimum_value": 0,
+      "starting_value": 0
+    },
+    "class_type": "IntControl"
+  },
+  "63": {
+    "inputs": {
+      "always_execute": true,
+      "strings": "https://github.com/kijai/ComfyUI-KJNodes\nhttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodes\nhttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodeshttps://github.com/kijai/ComfyUI-KJNodes",
+      "steps_per_cycle": 30,
+      "movement_type": "sine"
+    },
+    "class_type": "StringControl"
+  },
+  "64": {
+    "inputs": {
+      "seed": 0,
+      "steps": 20,
+      "cfg": 8,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1
+    },
+    "class_type": "KSampler"
+  }
+}

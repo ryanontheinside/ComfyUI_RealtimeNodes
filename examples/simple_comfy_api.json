@@ -1,0 +1,25 @@
+{
+  "57": {
+    "inputs": {
+      "image": "AnimateDiff_01089-audio.mp4",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "59": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  }
+}
