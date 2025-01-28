@@ -26,7 +26,7 @@ The intention for this repository is to build a suite of nodes that can be used 
 - **QuickShapeMask**: Rapidly generate shape masks (circle, square) with customizable dimensions.
 - **DTypeConverter**: Convert masks between different data types (float16, uint8, float32, float64).
 - **FastWebcamCapture**: High-performance webcam capture node with resizing capabilities.
-
+- **SimilarityFilter**: Filter images based on the similarity of previous frames and block execution if the similarity is too high.
 ### VAE Tools 🖼️
 - **TAESDVaeEncode**: TAESD VAE encoding node.
 - **TAESDVaeDecode**: TAESD VAE decoding node.

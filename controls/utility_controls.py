@@ -3,6 +3,7 @@ import time
 import numpy as np
 import cv2
 import torch
+import random
 
 class FPSMonitor(ControlNodeBase):
     """Generates an FPS overlay as an image and mask"""
@@ -121,3 +122,77 @@ class FPSMonitor(ControlNodeBase):
         self.set_state(state)
         
         return (state["cached_image"], state["cached_mask"])
+
+class SimilarityFilter(ControlNodeBase):
+    """A node that filters out similar consecutive images to prevent unnecessary workflow execution using StreamDiffusion's approach."""
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "always_execute": ("BOOLEAN", {"default": False}),
+                "threshold": ("FLOAT", {"default": 0.98, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "max_skip_frames": ("INT", {"default": 10, "min": 1, "max": 100, "step": 1}),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "update"
+    CATEGORY = "real-time/control/utility"
+
+    def __init__(self):
+        super().__init__()
+        self.cos = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
+
+    def update(self, image, threshold=0.98, max_skip_frames=10, always_execute=False):
+        print(f"[DEBUG] Input image object: {hex(id(image))}, shape: {image.shape}, device: {image.device}")
+        
+        # Get state with defaults
+        state = self.get_state({
+            "prev_image": None,
+            "skip_count": 0
+        })
+
+        # First frame case
+        if state["prev_image"] is None:
+            state["prev_image"] = image.detach().clone()
+            state["skip_count"] = 0
+            self.set_state(state)
+            return (image,)
+
+        # Calculate cosine similarity
+        cos_sim = self.cos(
+            state["prev_image"].reshape(-1), 
+            image.reshape(-1)
+        ).item()
+
+        # Calculate skip probability using StreamDiffusion's approach
+        if threshold >= 1:
+            skip_prob = 0
+        else:
+            skip_prob = max(0, 1 - (1 - cos_sim) / (1 - threshold))
+
+        # Generate random sample
+        sample = random.uniform(0, 1)
+
+        # If we should skip (probability check)
+        if skip_prob >= sample:
+            # Check if we've skipped too many frames
+            if state["skip_count"] >= max_skip_frames:
+                state["prev_image"] = image.detach().clone()
+                state["skip_count"] = 0
+                self.set_state(state)
+                return (image,)
+                
+            # Skip frame - return ExecutionBlocker to prevent downstream execution
+            state["skip_count"] += 1
+            self.set_state(state)
+            from comfy_execution.graph import ExecutionBlocker
+            return (ExecutionBlocker(None),)
+        
+        # Frame is different enough - process it
+        state["prev_image"] = image.detach().clone()
+        state["skip_count"] = 0
+        self.set_state(state)
+        return (image,)

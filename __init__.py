@@ -1,6 +1,6 @@
 from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
-from .controls.utility_controls import FPSMonitor
+from .controls.utility_controls import FPSMonitor, SimilarityFilter
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .quick_shape_mask import QuickShapeMask
 from .tiny_vae import TAESDVaeEncode, TAESDVaeDecode
@@ -14,8 +14,10 @@ NODE_CLASS_MAPPINGS = {
     "IntSequence": IntSequence,
     "StringSequence": StringSequence,
     "FPSMonitor": FPSMonitor,
+    "SimilarityFilter": SimilarityFilter,
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
+
     "ROINode": ROINode,
     #"IntervalControl": IntervalCo  ntrol,
     #"DeltaControl": DeltaControl,
@@ -44,7 +46,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TAESDVaeDecode": "TAESD VAE Decode (RyanOnTheInside)",
     "DTypeConverter": "DType Converter (RyanOnTheInside)",
     "FastWebcamCapture": "Fast Webcam Capture (RyanOnTheInside)",
+    "SimilarityFilter": "Similarity Filter (RyanOnTheInside)",
 }
+
 
 WEB_DIRECTORY = "./web/js"
 
