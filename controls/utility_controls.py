@@ -124,7 +124,7 @@ class FPSMonitor(ControlNodeBase):
         return (state["cached_image"], state["cached_mask"])
 
 class SimilarityFilter(ControlNodeBase):
-    """A node that filters out similar consecutive images to prevent unnecessary workflow execution using StreamDiffusion's approach."""
+    """A node that filters out similar consecutive images and outputs a signal to control downstream execution."""
     
     @classmethod
     def INPUT_TYPES(s):
@@ -137,7 +137,8 @@ class SimilarityFilter(ControlNodeBase):
             }
         }
     
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE", "BOOLEAN")
+    RETURN_NAMES = ("image", "should_execute")
     FUNCTION = "update"
     CATEGORY = "real-time/control/utility"
 
@@ -159,7 +160,7 @@ class SimilarityFilter(ControlNodeBase):
             state["prev_image"] = image.detach().clone()
             state["skip_count"] = 0
             self.set_state(state)
-            return (image,)
+            return (image, True)  # Always execute first frame
 
         # Calculate cosine similarity
         cos_sim = self.cos(
@@ -183,16 +184,59 @@ class SimilarityFilter(ControlNodeBase):
                 state["prev_image"] = image.detach().clone()
                 state["skip_count"] = 0
                 self.set_state(state)
-                return (image,)
+                return (image, True)  # Force execution after max skips
                 
-            # Skip frame - return ExecutionBlocker to prevent downstream execution
+            # Skip frame - return previous image and False for execution
             state["skip_count"] += 1
             self.set_state(state)
-            from comfy_execution.graph import ExecutionBlocker
-            return (ExecutionBlocker(None),)
+            return (state["prev_image"], False)
         
         # Frame is different enough - process it
         state["prev_image"] = image.detach().clone()
         state["skip_count"] = 0
         self.set_state(state)
-        return (image,)
+        return (image, True)
+
+class LazyCondition(ControlNodeBase):
+    """A node that uses lazy evaluation to truly skip execution of unused paths.
+    Maintains state of the last diffused image to avoid feedback loops."""
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "condition": ("BOOLEAN",),
+                "if_true": ("IMAGE", {"lazy": True}),  # Lazy input - the expensive diffusion path
+                "fallback": ("IMAGE",),  # Non-lazy input - just the input image
+                "use_fallback": ("BOOLEAN", {"default": False}),  # Whether to use fallback or state when condition is False
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "update"
+    CATEGORY = "real-time/control/utility"
+
+    def check_lazy_status(self, condition, if_true, fallback, use_fallback):
+        """Only evaluate the diffusion path if condition is True."""
+        needed = ["fallback"]  # Always need the input image
+        if condition:
+            needed.append("if_true")  # Only compute diffusion if needed
+        return needed
+
+    def update(self, condition, if_true, fallback, use_fallback):
+        """Route to either diffusion output or input image, maintaining state of last diffusion."""
+        state = self.get_state({
+            "prev_output": None
+        })
+
+        if condition:
+            # Update last diffused state when we run diffusion
+            state["prev_output"] = if_true.detach().clone() if if_true is not None else fallback
+            self.set_state(state)
+            return (if_true,)
+        else:
+            # If use_fallback is True, return fallback image, otherwise use previous state
+            if use_fallback or state["prev_output"] is None:
+                return (fallback,)
+            else:
+                return (state["prev_output"],)
