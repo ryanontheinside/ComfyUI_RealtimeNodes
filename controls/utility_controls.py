@@ -124,16 +124,32 @@ class FPSMonitor(ControlNodeBase):
         return (state["cached_image"], state["cached_mask"])
 
 class SimilarityFilter(ControlNodeBase):
-    """A node that filters out similar consecutive images and outputs a signal to control downstream execution."""
+    DESCRIPTION = "Filters out similar consecutive images and outputs a signal to control downstream execution."
     
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "image": ("IMAGE",),
-                "always_execute": ("BOOLEAN", {"default": False}),
-                "threshold": ("FLOAT", {"default": 0.98, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "max_skip_frames": ("INT", {"default": 10, "min": 1, "max": 100, "step": 1}),
+                "image": ("IMAGE", {
+                    "tooltip": "Input image to compare with previous frame"
+                }),
+                "always_execute": ("BOOLEAN", {
+                    "default": False,
+                }),
+                "threshold": ("FLOAT", {
+                    "default": 0.98,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.01,
+                    "tooltip": "Similarity threshold (0-1). Higher values mean more frames are considered similar"
+                }),
+                "max_skip_frames": ("INT", {
+                    "default": 10,
+                    "min": 1,
+                    "max": 100,
+                    "step": 1,
+                    "tooltip": "Maximum number of consecutive frames to skip before forcing execution"
+                }),
             }
         }
     
@@ -198,17 +214,26 @@ class SimilarityFilter(ControlNodeBase):
         return (image, True)
 
 class LazyCondition(ControlNodeBase):
-    """A node that uses lazy evaluation to truly skip execution of unused paths.
-    Maintains state of the last diffused image to avoid feedback loops."""
+    DESCRIPTION = "Uses lazy evaluation to truly skip execution of unused paths. Maintains state of the last diffused image to avoid feedback loops."
     
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "condition": ("BOOLEAN",),
-                "if_true": ("IMAGE", {"lazy": True}),  # Lazy input - the expensive diffusion path
-                "fallback": ("IMAGE",),  # Non-lazy input - just the input image
-                "use_fallback": ("BOOLEAN", {"default": False}),  # Whether to use fallback or state when condition is False
+                "condition": ("BOOLEAN", {
+                    "tooltip": "When True, evaluates and returns if_true path. When False, returns either fallback or previous state"
+                }),
+                "if_true": ("IMAGE", {
+                    "lazy": True,
+                    "tooltip": "The expensive computation path (e.g., diffusion) that should only be evaluated when condition is True"
+                }),
+                "fallback": ("IMAGE", {
+                    "tooltip": "Alternative image to use when condition is False (e.g., input frame)"
+                }),
+                "use_fallback": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "When False, uses last successful if_true result. When True, uses fallback image"
+                }),
             }
         }
     
@@ -230,13 +255,15 @@ class LazyCondition(ControlNodeBase):
         })
 
         if condition:
+            print("[LazyCondition] Condition True - Running diffusion path")
             # Update last diffused state when we run diffusion
             state["prev_output"] = if_true.detach().clone() if if_true is not None else fallback
             self.set_state(state)
             return (if_true,)
         else:
-            # If use_fallback is True, return fallback image, otherwise use previous state
             if use_fallback or state["prev_output"] is None:
+                print("[LazyCondition] Condition False - Using fallback image")
                 return (fallback,)
             else:
+                print("[LazyCondition] Condition False - Using previous diffusion result")
                 return (state["prev_output"],)
