@@ -426,10 +426,10 @@ class TextRenderer:
     FUNCTION = "render_text"
     CATEGORY = "image"
 
-    def render_text(self, text, width, height, font_size, font_color, background_color, 
+    def render_text(self, any, width, height, font_size, font_color, background_color, 
                    x_offset, y_offset, align, wrap_width):
         # Convert input to string if it isn't already
-        text = str(text)
+        any = str(any)
         
         # Create image with background
         image = Image.new('RGBA', (width, height), background_color)
@@ -456,10 +456,10 @@ class TextRenderer:
             # Assuming average character width is font_size/2 pixels
             char_width = font_size/2
             char_count = max(1, int(wrap_width / char_width))
-            text = "\n".join(textwrap.wrap(text, width=char_count))
+            any = "\n".join(textwrap.wrap(any, width=char_count))
         
         # Calculate text size
-        bbox = draw.textbbox((0, 0), text, font=pil_font)
+        bbox = draw.textbbox((0, 0), any, font=pil_font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
         
@@ -474,8 +474,8 @@ class TextRenderer:
         y = (height - text_height) // 2 + y_offset
         
         # Draw text
-        draw.multiline_text((x, y), text, font=pil_font, fill=font_color, align=align)
-        mask_draw.multiline_text((x, y), text, font=pil_font, fill=255, align=align)
+        draw.multiline_text((x, y), any, font=pil_font, fill=font_color, align=align)
+        mask_draw.multiline_text((x, y), any, font=pil_font, fill=255, align=align)
         
         # Convert PIL to tensor
         image_tensor = torch.from_numpy(np.array(image).astype(np.float32) / 255.0)[None,]
