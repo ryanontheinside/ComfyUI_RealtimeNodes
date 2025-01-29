@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 import torch
 import random
-
+from ..utils import AlwaysEqualProxy
 # Add package root to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from base.control_base import ControlNodeBase
@@ -211,14 +211,6 @@ class SimilarityFilter(ControlNodeBase):
         state["skip_count"] = 0
         self.set_state(state)
         return (image, True)
-
-class AlwaysEqualProxy(str):
-    #borrowed from https://github.com/theUpsider/ComfyUI-Logic
-    def __eq__(self, _):
-        return True
-
-    def __ne__(self, _):
-        return False
 
 class LazyCondition(ControlNodeBase):
     DESCRIPTION = "Uses lazy evaluation to truly skip execution of unused paths. Maintains state of the last value to circumvent feedback loops."

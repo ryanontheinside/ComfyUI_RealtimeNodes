@@ -2,8 +2,7 @@ from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
-from .quick_shape_mask import QuickShapeMask
-from .misc_nodes import DTypeConverter, FastWebcamCapture,  YOLOSimilarityCompare
+from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -18,15 +17,14 @@ NODE_CLASS_MAPPINGS = {
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
-
-
-
+    "TextRenderer": TextRenderer,
     "ROINode": ROINode,
     #"IntervalControl": IntervalCo  ntrol,
     #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
     "DTypeConverter": DTypeConverter,
     "FastWebcamCapture": FastWebcamCapture,
+    "MultilineText": MultilineText,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -50,7 +48,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "SimilarityFilter": "Similarity Filter (RyanOnTheInside)",
     "LazyCondition": "Lazy Condition (RyanOnTheInside)",
     "YOLOSimilarityCompare": "YOLO Similarity Compare (RyanOnTheInside)",
-
+    "TextRenderer": "Text Renderer (RyanOnTheInside)",
+    "MultilineText": "Multiline Text (RyanOnTheInside)",
 }
 
 
