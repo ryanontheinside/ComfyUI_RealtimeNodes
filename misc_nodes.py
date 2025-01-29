@@ -4,7 +4,7 @@ import numpy as np
 import base64
 import re
 from io import BytesIO
-from PIL import Image, ImageFont, ImageDraw
+from PIL import Image, ImageFont, ImageDraw, ImageOps
 import nodes
 import random
 from torchvision import transforms
@@ -408,7 +408,7 @@ class TextRenderer:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "any": (AlwaysEqualProxy(), {"multiline": True}),  # Accept any input type and convert to string
+                "any": (AlwaysEqualProxy("*"),),  # Accept any input type and convert to string
                 "width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
                 "font_size": ("INT", {"default": 48, "min": 1, "max": 512, "step": 1}),
@@ -424,7 +424,7 @@ class TextRenderer:
     
     RETURN_TYPES = ("IMAGE", "MASK")
     FUNCTION = "render_text"
-    CATEGORY = "image"
+    CATEGORY = "real-time"
 
     def render_text(self, any, width, height, font_size, font_color, background_color, 
                    x_offset, y_offset, align, wrap_width):
@@ -530,4 +530,46 @@ class MultilineText:
         result = '\n'.join(lines)
         
         return (result,)
+
+class LoadImageFromPath_:
+    """A simple node that loads an image from a given file path"""
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "image_path": ("STRING", {
+                "default": "",
+                "multiline": False,
+                "tooltip": "Full path to the image file to load"
+            })
+        }}
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    FUNCTION = "load_image"
+    CATEGORY = "image"
+
+    def load_image(self, image_path):
+        # Open and process the image
+        img = Image.open(image_path)
+        img = ImageOps.exif_transpose(img)
+        
+        # Convert to RGB if needed
+        if img.mode == 'I':
+            img = img.point(lambda i: i * (1 / 255))
+        image = img.convert("RGB")
+        
+        # Convert to tensor
+        image = np.array(image).astype(np.float32) / 255.0
+        image = torch.from_numpy(image)[None,]
+        
+        # Create mask from alpha channel if it exists
+        if 'A' in img.getbands():
+            mask = np.array(img.getchannel('A')).astype(np.float32) / 255.0
+            mask = 1. - torch.from_numpy(mask)
+        else:
+            mask = torch.zeros((64,64), dtype=torch.float32, device="cpu")
+        
+        mask = mask.unsqueeze(0)
+        
+        return (image, mask)
     
