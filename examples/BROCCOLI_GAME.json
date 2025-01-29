@@ -1,0 +1,528 @@
+{
+  "3": {
+    "inputs": {
+      "unet_name": "ComfyUI_STAT_SD15_$stat-b-1-h-512-w-512_00001_.engine",
+      "model_type": "SD15"
+    },
+    "class_type": "TensorRTLoader",
+    "_meta": {
+      "title": "TensorRT Loader"
+    }
+  },
+  "4": {
+    "inputs": {
+      "ckpt_name": "dreamshaper_8.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "5": {
+    "inputs": {
+      "text": "broccoli against a white background",
+      "clip": [
+        "4",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "4",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "7": {
+    "inputs": {
+      "seed": 566159840466924,
+      "steps": 1,
+      "cfg": 1,
+      "sampler_name": "lcm",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "3",
+        0
+      ],
+      "positive": [
+        "9",
+        0
+      ],
+      "negative": [
+        "9",
+        1
+      ],
+      "latent_image": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "8": {
+    "inputs": {
+      "control_net_name": "1.5/control_v11f1p_sd15_depth_fp16.safetensors"
+    },
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "Load ControlNet Model"
+    }
+  },
+  "9": {
+    "inputs": {
+      "strength": 0.6,
+      "start_percent": 0,
+      "end_percent": 0.6,
+      "positive": [
+        "5",
+        0
+      ],
+      "negative": [
+        "6",
+        0
+      ],
+      "control_net": [
+        "10",
+        0
+      ],
+      "image": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "ControlNetApplyAdvanced",
+    "_meta": {
+      "title": "Apply ControlNet"
+    }
+  },
+  "10": {
+    "inputs": {
+      "backend": "inductor",
+      "fullgraph": false,
+      "mode": "reduce-overhead",
+      "controlnet": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "TorchCompileLoadControlNet",
+    "_meta": {
+      "title": "TorchCompileLoadControlNet"
+    }
+  },
+  "11": {
+    "inputs": {
+      "vae_name": "taesd"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "13": {
+    "inputs": {
+      "backend": "inductor",
+      "fullgraph": true,
+      "mode": "reduce-overhead",
+      "compile_encoder": true,
+      "compile_decoder": true,
+      "vae": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "TorchCompileLoadVAE",
+    "_meta": {
+      "title": "TorchCompileLoadVAE"
+    }
+  },
+  "14": {
+    "inputs": {
+      "samples": [
+        "7",
+        0
+      ],
+      "vae": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "16": {
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "40": {
+    "inputs": {
+      "engine": "depth_anything_v2_vitb-fp16.engine",
+      "images": [
+        "112",
+        0
+      ]
+    },
+    "class_type": "DepthAnythingTensorrt",
+    "_meta": {
+      "title": "Depth Anything Tensorrt"
+    }
+  },
+  "83": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "14",
+        0
+      ],
+      "source": [
+        "102",
+        0
+      ],
+      "mask": [
+        "102",
+        1
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "90": {
+    "inputs": {
+      "conf": 0.25,
+      "iou": 0.7,
+      "height": 640,
+      "width": 640,
+      "device": "cuda:0",
+      "half": false,
+      "augment": false,
+      "agnostic_nms": false,
+      "classes": "None",
+      "model": [
+        "93",
+        0
+      ],
+      "image": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "UltralyticsInference",
+    "_meta": {
+      "title": "Ultralytics Inference"
+    }
+  },
+  "91": {
+    "inputs": {
+      "conf": 0.25,
+      "iou": 0.7,
+      "height": 640,
+      "width": 640,
+      "device": "cuda:0",
+      "half": false,
+      "augment": false,
+      "agnostic_nms": false,
+      "classes": "None",
+      "model": [
+        "93",
+        0
+      ],
+      "image": [
+        "142",
+        0
+      ]
+    },
+    "class_type": "UltralyticsInference",
+    "_meta": {
+      "title": "Ultralytics Inference"
+    }
+  },
+  "93": {
+    "inputs": {
+      "model_name": "yolov8s.pt"
+    },
+    "class_type": "UltralyticsModelLoader",
+    "_meta": {
+      "title": "Ultralytics Model Loader"
+    }
+  },
+  "94": {
+    "inputs": {
+      "class_weight": 0.3,
+      "spatial_weight": 0.2,
+      "confidence_weight": 0.2,
+      "size_weight": 0.15,
+      "relationship_weight": 0.15,
+      "threshold": 0.7000000000000001,
+      "ULTRALYTICS_RESULTS1": [
+        "91",
+        0
+      ],
+      "ULTRALYTICS_RESULTS2": [
+        "90",
+        0
+      ]
+    },
+    "class_type": "YOLOSimilarityCompare",
+    "_meta": {
+      "title": "Yolo Similarity Compare 🕒🅡🅣🅝"
+    }
+  },
+  "96": {
+    "inputs": {
+      "use_fallback": true,
+      "condition": [
+        "94",
+        1
+      ],
+      "if_true": [
+        "83",
+        0
+      ],
+      "fallback": [
+        "100",
+        0
+      ]
+    },
+    "class_type": "LazyCondition",
+    "_meta": {
+      "title": "Lazy Condition 🕒🅡🅣🅝"
+    }
+  },
+  "100": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "113",
+        0
+      ],
+      "source": [
+        "105",
+        0
+      ],
+      "mask": [
+        "105",
+        1
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "102": {
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "font_size": 80,
+      "font_color": "black",
+      "background_color": "black",
+      "x_offset": 0,
+      "y_offset": -206,
+      "align": "center",
+      "wrap_width": 0,
+      "any": [
+        "103",
+        0
+      ]
+    },
+    "class_type": "TextRenderer",
+    "_meta": {
+      "title": "Text Renderer 🕒🅡🅣🅝"
+    }
+  },
+  "103": {
+    "inputs": {
+      "text": "WINNER!!",
+      "strip_whitespace": true,
+      "remove_empty_lines": false
+    },
+    "class_type": "MultilineText",
+    "_meta": {
+      "title": "Multiline Text 🕒🅡🅣🅝"
+    }
+  },
+  "105": {
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "font_size": 20,
+      "font_color": "black",
+      "background_color": "black",
+      "x_offset": -13,
+      "y_offset": -225,
+      "align": "right",
+      "wrap_width": 0,
+      "any": [
+        "94",
+        0
+      ]
+    },
+    "class_type": "TextRenderer",
+    "_meta": {
+      "title": "Text Renderer 🕒🅡🅣🅝"
+    }
+  },
+  "112": {
+    "inputs": {
+      "always_execute": true,
+      "threshold": 0.98,
+      "max_skip_frames": 10,
+      "image": [
+        "115",
+        0
+      ]
+    },
+    "class_type": "SimilarityFilter",
+    "_meta": {
+      "title": "Similarity Filter 🕒🅡🅣🅝"
+    }
+  },
+  "113": {
+    "inputs": {
+      "use_fallback": false,
+      "condition": [
+        "112",
+        1
+      ],
+      "if_true": [
+        "14",
+        0
+      ],
+      "fallback": [
+        "112",
+        0
+      ]
+    },
+    "class_type": "LazyCondition",
+    "_meta": {
+      "title": "Lazy Condition 🕒🅡🅣🅝"
+    }
+  },
+  "115": {
+    "inputs": {
+      "image": "catfacegirl.png",
+      "upload": "image"
+    },
+    "class_type": "PrimaryInputLoadImage",
+    "_meta": {
+      "title": "PrimaryInputLoadImage"
+    }
+  },
+  "137": {
+    "inputs": {
+      "x": 16,
+      "y": 371,
+      "resize_source": false,
+      "destination": [
+        "96",
+        0
+      ],
+      "source": [
+        "141",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "138": {
+    "inputs": {
+      "images": [
+        "137",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "139": {
+    "inputs": {
+      "width": 136,
+      "height": 136,
+      "batch_size": 1,
+      "color": 467
+    },
+    "class_type": "EmptyImage",
+    "_meta": {
+      "title": "EmptyImage"
+    }
+  },
+  "140": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "width": 128,
+      "height": 128,
+      "crop": "disabled",
+      "image": [
+        "142",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Upscale Image"
+    }
+  },
+  "141": {
+    "inputs": {
+      "x": 4,
+      "y": 4,
+      "resize_source": false,
+      "destination": [
+        "139",
+        0
+      ],
+      "source": [
+        "140",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "142": {
+    "inputs": {
+      "image_path": "/workspace/comfyRealtime/ComfyUI/input/broccoli.png"
+    },
+    "class_type": "LoadImageFromPath_",
+    "_meta": {
+      "title": "Load Image From Path 🕒🅡🅣🅝"
+    }
+  }
+}
