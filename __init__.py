@@ -1,9 +1,8 @@
 from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
-from .controls.utility_controls import FPSMonitor
+from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .quick_shape_mask import QuickShapeMask
-from .tiny_vae import TAESDVaeEncode, TAESDVaeDecode
 from .misc_nodes import DTypeConverter, FastWebcamCapture
 
 NODE_CLASS_MAPPINGS = {
@@ -14,14 +13,18 @@ NODE_CLASS_MAPPINGS = {
     "IntSequence": IntSequence,
     "StringSequence": StringSequence,
     "FPSMonitor": FPSMonitor,
+    "SimilarityFilter": SimilarityFilter,
+    "LazyCondition": LazyCondition,
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
+
+
+
+
     "ROINode": ROINode,
     #"IntervalControl": IntervalCo  ntrol,
     #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
-    "TAESDVaeEncode": TAESDVaeEncode,
-    "TAESDVaeDecode": TAESDVaeDecode,
     "DTypeConverter": DTypeConverter,
     "FastWebcamCapture": FastWebcamCapture,
 }
@@ -44,7 +47,12 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TAESDVaeDecode": "TAESD VAE Decode (RyanOnTheInside)",
     "DTypeConverter": "DType Converter (RyanOnTheInside)",
     "FastWebcamCapture": "Fast Webcam Capture (RyanOnTheInside)",
+    "SimilarityFilter": "Similarity Filter (RyanOnTheInside)",
+    "LazyCondition": "Lazy Condition (RyanOnTheInside)",
+
+
 }
+
 
 WEB_DIRECTORY = "./web/js"
 

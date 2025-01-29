@@ -26,10 +26,8 @@ The intention for this repository is to build a suite of nodes that can be used 
 - **QuickShapeMask**: Rapidly generate shape masks (circle, square) with customizable dimensions.
 - **DTypeConverter**: Convert masks between different data types (float16, uint8, float32, float64).
 - **FastWebcamCapture**: High-performance webcam capture node with resizing capabilities.
-
-### VAE Tools 🖼️
-- **TAESDVaeEncode**: TAESD VAE encoding node.
-- **TAESDVaeDecode**: TAESD VAE decoding node.
+- **SimilarityFilter**: Filter out similar consecutive images and control downstream execution. Perfect for optimizing real-time workflows by skipping redundant processing of similar frames.
+- **LazyCondition**: Powerful conditional execution node that supports any input type. Uses lazy evaluation to truly skip execution of unused paths and maintains state to avoid feedback loops.
 
 ## Movement Patterns 🔄
 
@@ -60,6 +58,12 @@ Sequence controls allow you to specify exact values to cycle through. You can co
 
 ### FPS Monitor
 Outputs an image and mask showing current and average FPS. Useful for performance monitoring in real-time workflows.
+
+### Utility Controls
+Use utility nodes to optimize and control your workflow:
+- **FPS Monitor**: Monitor performance with a visual overlay
+- **SimilarityFilter**: Skip processing of similar frames by comparing consecutive images. Great for optimizing real-time workflows by only processing frames that have meaningful changes.
+- **LazyCondition**: Create conditional execution paths that truly skip processing of unused branches. Works with any input type (images, latents, text, numbers) and maintains state of the last successful output to avoid feedback loops.
 
 ## Examples 🎬
 

@@ -3,12 +3,26 @@ import { app } from "../../../scripts/app.js";
 
 // TODO: Add validation for step values to ensure they match target widget constraints
 
+// List of widget names that need validation
+const VALIDATED_WIDGETS = ["values", "maximum_value", "minimum_value", "starting_value"];
 
 // Register validation behavior when nodes are connected
 app.registerExtension({
     name: "RealTime.WidgetValidation",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (!nodeData.category?.startsWith("real-time/control/")) {
+            return;
+        }
+
+        // Check if node has any widgets that need validation
+        const hasValidatedWidgets = nodeData.input?.required && 
+            Object.entries(nodeData.input.required).some(([name, config]) => 
+                VALIDATED_WIDGETS.includes(name) || 
+                (typeof config === "object" && config[0] === "FLOAT") ||
+                (typeof config === "object" && config[0] === "INT")
+            );
+
+        if (!hasValidatedWidgets) {
             return;
         }
 
