@@ -2,7 +2,9 @@ from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
-from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText
+from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText, LoadImageFromPath_
+
+import re
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -25,32 +27,26 @@ NODE_CLASS_MAPPINGS = {
     "DTypeConverter": DTypeConverter,
     "FastWebcamCapture": FastWebcamCapture,
     "MultilineText": MultilineText,
+    "LoadImageFromPath_": LoadImageFromPath_,
 }
 
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "FloatControl": "Float Control (RyanOnTheInside)",
-    "IntControl": "Int Control (RyanOnTheInside)",
-    "StringControl": "String Control (RyanOnTheInside)",
-    "FloatSequence": "Float Sequence (RyanOnTheInside)",
-    "IntSequence": "Int Sequence (RyanOnTheInside)",
-    "StringSequence": "String Sequence (RyanOnTheInside)",
-    "FPSMonitor": "FPS Monitor (RyanOnTheInside)",
-    "MotionController": "Float Motion Controller (RyanOnTheInside)",
-    "ROINode": "ROI Node (RyanOnTheInside)",
-    "IntegerMotionController": "Integer Motion Controller (RyanOnTheInside)",
-    #"IntervalControl": "Interval Control (RyanOnTheInside)",
-    #"DeltaControl": "Delta Control (RyanOnTheInside)",
-    "QuickShapeMask": "Quick Shape Mask (RyanOnTheInside)",
-    "TAESDVaeEncode": "TAESD VAE Encode (RyanOnTheInside)",
-    "TAESDVaeDecode": "TAESD VAE Decode (RyanOnTheInside)",
-    "DTypeConverter": "DType Converter (RyanOnTheInside)",
-    "FastWebcamCapture": "Fast Webcam Capture (RyanOnTheInside)",
-    "SimilarityFilter": "Similarity Filter (RyanOnTheInside)",
-    "LazyCondition": "Lazy Condition (RyanOnTheInside)",
-    "YOLOSimilarityCompare": "YOLO Similarity Compare (RyanOnTheInside)",
-    "TextRenderer": "Text Renderer (RyanOnTheInside)",
-    "MultilineText": "Multiline Text (RyanOnTheInside)",
-}
+NODE_DISPLAY_NAME_MAPPINGS = {}
+
+suffix = " 🕒🅡🅣🅝"
+
+for node_name in NODE_CLASS_MAPPINGS.keys():
+    # Convert camelCase or snake_case to Title Case
+    if node_name not in NODE_DISPLAY_NAME_MAPPINGS:
+        display_name = ' '.join(word.capitalize() for word in re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\W|$)|\d+', node_name))
+    else:
+        display_name = NODE_DISPLAY_NAME_MAPPINGS[node_name]
+    
+    # Add the suffix if it's not already present
+    if not display_name.endswith(suffix):
+        display_name += suffix
+    
+    # Assign the final display name to the mappings
+    NODE_DISPLAY_NAME_MAPPINGS[node_name] = display_name
 
 
 WEB_DIRECTORY = "./web/js"
