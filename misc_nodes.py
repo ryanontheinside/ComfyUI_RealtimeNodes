@@ -437,7 +437,7 @@ class TextRenderer:
         
         # Load font from assets directory
         import os
-        font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "dejavu-sans", "DejaVuSans.ttf")
+        font_path = os.path.join(os.path.dirname(__file__), "fonts", "dejavu-sans", "DejaVuSans.ttf")
         try:
             pil_font = ImageFont.truetype(font_path, font_size)
         except Exception as e:
