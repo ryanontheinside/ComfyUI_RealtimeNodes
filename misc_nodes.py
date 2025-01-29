@@ -4,16 +4,12 @@ import numpy as np
 import base64
 import re
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageFont, ImageDraw
 import nodes
 import random
 from torchvision import transforms
-
+from .utils import AlwaysEqualProxy
 MAX_RESOLUTION = nodes.MAX_RESOLUTION  # Get the same max resolution as core nodes
-
-class AnyType(str):
-    def __ne__(self, __value: object) -> bool:
-        return False
 
 class DTypeConverter:
     """Converts masks to specified data types"""
@@ -298,3 +294,240 @@ Detected Classes in Image 2: {[coco_classes[int(c)] for c in unique_classes2]}""
         
         return (float(similarity), above_threshold, explanation,)
 
+class QuickShapeMask:
+    """A node that quickly generates basic shape masks"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "shape": (["circle", "square"], {
+                    "default": "circle",
+                    "tooltip": "The shape of the mask to generate"
+                }),
+                "width": ("INT", {
+                    "default": 64,
+                    "min": 1,
+                    "max": 4096,
+                    "step": 1,
+                    "tooltip": "Width of the shape in pixels"
+                }),
+                "height": ("INT", {
+                    "default": 64,
+                    "min": 1,
+                    "max": 4096,
+                    "step": 1,
+                    "tooltip": "Height of the shape in pixels"
+                }),
+                "x": ("INT", {
+                    "default": 256,
+                    "min": 0,
+                    "max": 4096,
+                    "step": 1,
+                    "tooltip": "X position of the shape center (0 = left edge)"
+                }),
+                "y": ("INT", {
+                    "default": 256,
+                    "min": 0,
+                    "max": 4096,
+                    "step": 1,
+                    "tooltip": "Y position of the shape center (0 = top edge)"
+                }),
+                "canvas_width": ("INT", {
+                    "default": 512,
+                    "min": 1,
+                    "max": 4096,
+                    "step": 1,
+                    "tooltip": "Width of the output mask"
+                }),
+                "canvas_height": ("INT", {
+                    "default": 512,
+                    "min": 1,
+                    "max": 4096,
+                    "step": 1,
+                    "tooltip": "Height of the output mask"
+                }),
+                "batch_size": ("INT", {
+                    "default": 1,
+                    "min": 1,
+                    "max": 64,
+                    "step": 1,
+                    "tooltip": "Number of identical masks to generate"
+                })
+            }
+        }
+
+    RETURN_TYPES = ("MASK",)
+    FUNCTION = "generate_mask"
+    CATEGORY = "mask"
+    
+    DESCRIPTION = "Generates a mask containing a basic shape (circle or square) with high performance"
+
+    def generate_mask(self, shape, width, height, x, y, canvas_width, canvas_height, batch_size):
+        # Create empty mask
+        mask = np.zeros((canvas_height, canvas_width), dtype=np.float32)
+        
+        # Calculate boundaries
+        half_width = width // 2
+        half_height = height // 2
+        
+        # Calculate shape boundaries
+        left = max(0, x - half_width)
+        right = min(canvas_width, x + half_width)
+        top = max(0, y - half_height)
+        bottom = min(canvas_height, y + half_height)
+        
+        if shape == "square":
+            # Simple square mask
+            mask[top:bottom, left:right] = 1.0
+            
+        else:  # circle
+            # Create coordinate grids for the region of interest
+            Y, X = np.ogrid[top:bottom, left:right]
+            
+            # Calculate distances from center for the region
+            dist_x = (X - x)
+            dist_y = (Y - y)
+            
+            # Create circle mask using distance formula
+            circle_mask = (dist_x**2 / (width/2)**2 + dist_y**2 / (height/2)**2) <= 1
+            
+            # Apply circle to the region
+            mask[top:bottom, left:right][circle_mask] = 1.0
+        
+        # Convert to torch tensor and add batch dimension (BHW format)
+        mask_tensor = torch.from_numpy(mask)
+        
+        # Expand to requested batch size
+        mask_tensor = mask_tensor.unsqueeze(0).expand(batch_size, -1, -1)
+        
+        return (mask_tensor,)
+
+class TextRenderer:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "any": (AlwaysEqualProxy(), {"multiline": True}),  # Accept any input type and convert to string
+                "width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+                "height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+                "font_size": ("INT", {"default": 48, "min": 1, "max": 512, "step": 1}),
+                "font_color": ("STRING", {"default": "white"}),
+                "background_color": ("STRING", {"default": "black"}),
+                "x_offset": ("INT", {"default": 0, "min": -4096, "max": 4096, "step": 1}),
+                "y_offset": ("INT", {"default": 0, "min": -4096, "max": 4096, "step": 1}),
+                "align": (["left", "center", "right"], {"default": "center"}),
+                "wrap_width": ("INT", {"default": 0, "min": 0, "max": MAX_RESOLUTION, "step": 8, 
+                             "tooltip": "Width to wrap text at (0 = no wrapping)"}),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE", "MASK")
+    FUNCTION = "render_text"
+    CATEGORY = "image"
+
+    def render_text(self, text, width, height, font_size, font_color, background_color, 
+                   x_offset, y_offset, align, wrap_width):
+        # Convert input to string if it isn't already
+        text = str(text)
+        
+        # Create image with background
+        image = Image.new('RGBA', (width, height), background_color)
+        mask = Image.new('L', (width, height), 0)  # Black mask initially
+        
+        # Load font from assets directory
+        import os
+        font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "dejavu-sans", "DejaVuSans.ttf")
+        try:
+            pil_font = ImageFont.truetype(font_path, font_size)
+        except Exception as e:
+            print(f"Failed to load font from {font_path}, falling back to default. Error: {str(e)}")
+            pil_font = ImageFont.load_default()
+        
+        # Create drawing objects
+        draw = ImageDraw.Draw(image)
+        mask_draw = ImageDraw.Draw(mask)
+        
+        import textwrap
+        
+        # Handle text wrapping
+        if wrap_width > 0:
+            # Convert wrap_width from pixels to approximate character count
+            # Assuming average character width is font_size/2 pixels
+            char_width = font_size/2
+            char_count = max(1, int(wrap_width / char_width))
+            text = "\n".join(textwrap.wrap(text, width=char_count))
+        
+        # Calculate text size
+        bbox = draw.textbbox((0, 0), text, font=pil_font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        
+        # Calculate position
+        if align == "left":
+            x = 0 + x_offset
+        elif align == "right":
+            x = width - text_width + x_offset
+        else:  # center
+            x = (width - text_width) // 2 + x_offset
+        
+        y = (height - text_height) // 2 + y_offset
+        
+        # Draw text
+        draw.multiline_text((x, y), text, font=pil_font, fill=font_color, align=align)
+        mask_draw.multiline_text((x, y), text, font=pil_font, fill=255, align=align)
+        
+        # Convert PIL to tensor
+        image_tensor = torch.from_numpy(np.array(image).astype(np.float32) / 255.0)[None,]
+        mask_tensor = torch.from_numpy(np.array(mask).astype(np.float32) / 255.0)[None,]
+        
+        # If image has alpha channel, use it to modify the mask
+        if image_tensor.shape[-1] == 4:
+            mask_tensor = mask_tensor * image_tensor[..., 3]
+            image_tensor = image_tensor[..., :3]  # Keep only RGB channels
+        
+        return (image_tensor, mask_tensor)
+
+class MultilineText:
+    """A simple node for creating and formatting multiline text"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "text": ("STRING", {
+                    "multiline": True,
+                    "default": "Line 1\nLine 2\nLine 3",
+                    "tooltip": "Enter text (use \\n for new lines)"
+                }),
+                "strip_whitespace": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Remove leading/trailing whitespace from each line"
+                }),
+                "remove_empty_lines": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Remove empty or whitespace-only lines"
+                })
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "process_text"
+    CATEGORY = "text"
+    
+    def process_text(self, text, strip_whitespace, remove_empty_lines):
+        # Split text into lines
+        lines = text.split('\n')
+        
+        # Process lines according to settings
+        if strip_whitespace:
+            lines = [line.strip() for line in lines]
+        
+        if remove_empty_lines:
+            lines = [line for line in lines if line.strip()]
+        
+        # Rejoin lines
+        result = '\n'.join(lines)
+        
+        return (result,)
+    
