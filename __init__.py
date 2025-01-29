@@ -3,7 +3,7 @@ from .controls.sequence_controls import FloatSequence, IntSequence, StringSequen
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .quick_shape_mask import QuickShapeMask
-from .misc_nodes import DTypeConverter, FastWebcamCapture
+from .misc_nodes import DTypeConverter, FastWebcamCapture,  YOLOSimilarityCompare
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -17,7 +17,7 @@ NODE_CLASS_MAPPINGS = {
     "LazyCondition": LazyCondition,
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
-
+    "YOLOSimilarityCompare": YOLOSimilarityCompare,
 
 
 
@@ -49,7 +49,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FastWebcamCapture": "Fast Webcam Capture (RyanOnTheInside)",
     "SimilarityFilter": "Similarity Filter (RyanOnTheInside)",
     "LazyCondition": "Lazy Condition (RyanOnTheInside)",
-
+    "YOLOSimilarityCompare": "YOLO Similarity Compare (RyanOnTheInside)",
 
 }
 
