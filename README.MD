@@ -29,6 +29,81 @@ The intention for this repository is to build a suite of nodes that can be used 
 - **SimilarityFilter**: Filter out similar consecutive images and control downstream execution. Perfect for optimizing real-time workflows by skipping redundant processing of similar frames.
 - **LazyCondition**: Powerful conditional execution node that supports any input type. Uses lazy evaluation to truly skip execution of unused paths and maintains state to avoid feedback loops.
 
+## Audio-Reactive Controls
+
+The RealTime Nodes pack now includes audio-reactive controls that can respond to live audio input. These nodes allow you to create dynamic animations and effects that respond to music or other audio sources.
+
+### Available Audio Controls
+
+1. **Volume Control**
+   - Reacts to overall audio volume (RMS)
+   - Smoothly interpolates between min and max values
+   - Perfect for size, opacity, or intensity controls
+
+2. **Frequency Band Control**
+   - Analyzes specific frequency ranges (bass, mids, treble)
+   - 32 frequency bands available
+   - Great for creating frequency-specific animations
+
+3. **Beat Control**
+   - Detects beats in the audio
+   - Outputs trigger values on beat detection
+   - Useful for synchronizing effects with music
+
+### Audio Features
+
+All audio processing is done in real-time with the following specifications:
+- 48kHz sample rate
+- 16-bit audio depth
+- Mono channel input
+- 500ms default buffer size (configurable)
+- Mel-scaled frequency analysis
+- Onset detection for beat tracking
+
+### Performance Considerations
+
+- Audio processing is optimized using numpy and scipy
+- Shared feature cache reduces redundant calculations
+- Smoothing options available for all controls
+- Thread-safe implementation for real-time processing
+
+### Example Usage
+
+```python
+# Connect a Volume Control to an image scale:
+volume_control = VolumeControl()
+volume_control.update(
+    processor="audio",
+    feature="rms",
+    smoothing=0.5,
+    min_value=0.5,
+    max_value=2.0
+)
+
+# Use frequency bands to control color:
+freq_control = FrequencyBandControl()
+freq_control.update(
+    processor="audio",
+    feature="spectrum",
+    band_start=0,  # Bass frequencies
+    band_end=4,
+    smoothing=0.3,
+    min_value=0.0,
+    max_value=1.0
+)
+
+# Trigger effects on beats:
+beat_control = BeatControl()
+beat_control.update(
+    processor="audio",
+    feature="onset",
+    threshold=0.5,
+    trigger_value=1.0,
+    fallback_value=0.0,
+    smoothing=0.2
+)
+```
+
 ## Movement Patterns 🔄
 
 All value and motion controls support various movement patterns:

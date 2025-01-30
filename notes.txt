@@ -1,0 +1,88 @@
+ComfyStream Audio Format Specification
+Basic Properties
+| Property | Value | Notes |
+|----------|--------|-------|
+| Sample Rate | 48kHz (48000 Hz) | Standard for WebRTC |
+| Bit Depth | 16-bit signed | Range: -32768 to 32767 |
+| Channels | Mono | Converted via resampler |
+| Frame Size | 960 samples | 20ms chunks (48000 0.02) |
+Data Flow
+Input: Audio comes from WebRTC through AudioStreamTrack
+Preprocessing:
+Resampled to mono using av.audio.resampler.AudioResampler
+Converted to s16 format
+Flattened to 1D numpy array
+Node Interface
+When writing audio processing nodes, you'll receive:
+Type: Numpy array (np.ndarray)
+Shape: 1-dimensional (N,) where N depends on buffer size
+Data Type: np.int16
+Default Buffer: 500ms = 24000 samples (configurable via buffer_size parameter)
+
+
+nodes for ComfyStream interface:
+
+import numpy as np
+
+from comfystream import tensor_cache
+
+class LoadAudioTensor:
+    CATEGORY = "audio_utils"
+    RETURN_TYPES = ("AUDIO",)
+    FUNCTION = "execute"
+
+    def __init__(self):
+        self.audio_buffer = np.array([])
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "buffer_size": ("FLOAT", {"default": 500.0})
+            }
+        }
+
+    @classmethod
+    def IS_CHANGED():
+        return float("nan")
+
+    def execute(self, buffer_size):
+        audio = tensor_cache.audio_inputs.get(block=True)
+        self.audio_buffer = np.concatenate((self.audio_buffer, audio))
+        
+        buffer_size_samples = int(buffer_size * 48)
+
+        if self.audio_buffer.size >= buffer_size_samples:
+            buffered_audio = self.audio_buffer[:buffer_size_samples]
+            self.audio_buffer = self.audio_buffer[buffer_size_samples:]
+            return (buffered_audio,)
+        else:
+            return (None,)
+
+
+
+from comfystream import tensor_cache
+
+
+class SaveAudioTensor:
+    CATEGORY = "audio_utils"
+    RETURN_TYPES = ()
+    FUNCTION = "execute"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "audio": ("AUDIO",),
+            }
+        }
+
+    @classmethod
+    def IS_CHANGED(s):
+        return float("nan")
+
+    def execute(self, audio):
+        fut = tensor_cache.audio_outputs.get()
+        fut.set_result((audio))
+        return (audio,)
