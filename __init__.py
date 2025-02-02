@@ -1,10 +1,22 @@
 from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
+from .controls.state_management_controls import StateResetNode, StateTestNode
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
-from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText, LoadImageFromPath_
+from .misc_nodes import( 
+    DTypeConverter, 
+    FastWebcamCapture, 
+    YOLOSimilarityCompare, 
+    TextRenderer, 
+    QuickShapeMask,  
+    MultilineText, 
+    LoadImageFromPath_
+)
+from .media_pipe_nodes import HandTrackingNode, HandMaskNode
+from .controls.mask_controls import RepulsiveMaskNode, ResizeMaskNode
 
 import re
+
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -21,14 +33,23 @@ NODE_CLASS_MAPPINGS = {
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
     "ROINode": ROINode,
-    #"IntervalControl": IntervalCo  ntrol,
-    #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
     "DTypeConverter": DTypeConverter,
     "FastWebcamCapture": FastWebcamCapture,
     "MultilineText": MultilineText,
     "LoadImageFromPath_": LoadImageFromPath_,
+    "HandTrackingNode": HandTrackingNode,
+    "HandMaskNode": HandMaskNode,
+    #"RepulsiveMaskNode": RepulsiveMaskNode,
+    "ResizeMaskNode": ResizeMaskNode,
+    "StateResetNode": StateResetNode,
+    "StateTestNode": StateTestNode,
 }
+
+
+
+
+
 
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
