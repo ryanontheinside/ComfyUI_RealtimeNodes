@@ -30,6 +30,8 @@ ENV/
 *.swp
 *.swo
 
+/.cursor
+
 # Ignore assets folder but keep the folder structure
 assets/*
 !assets/.gitkeep
