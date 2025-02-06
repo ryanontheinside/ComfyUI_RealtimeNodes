@@ -3,6 +3,7 @@ from .controls.sequence_controls import FloatSequence, IntSequence, StringSequen
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText, LoadImageFromPath_
+from .stream_diffusion_nodes import StreamDiffusionRCFG, StreamDiffusionSampler, StreamDiffusionLatentBuffer
 
 import re
 
@@ -21,20 +22,23 @@ NODE_CLASS_MAPPINGS = {
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
     "ROINode": ROINode,
-    #"IntervalControl": IntervalCo  ntrol,
-    #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
     "DTypeConverter": DTypeConverter,
     "FastWebcamCapture": FastWebcamCapture,
     "MultilineText": MultilineText,
     "LoadImageFromPath_": LoadImageFromPath_,
-}
+    "StreamDiffusionRCFG": StreamDiffusionRCFG,
+    "StreamDiffusionSampler": StreamDiffusionSampler,
+    "StreamDiffusionLatentBuffer": StreamDiffusionLatentBuffer,
+}       
+
 
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
 suffix = " 🕒🅡🅣🅝"
 
 for node_name in NODE_CLASS_MAPPINGS.keys():
+
     # Convert camelCase or snake_case to Title Case
     if node_name not in NODE_DISPLAY_NAME_MAPPINGS:
         display_name = ' '.join(word.capitalize() for word in re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\W|$)|\d+', node_name))
