@@ -2,14 +2,18 @@ from .base.control_base import ControlNodeBase
 import torch
 import comfy.model_management
 import comfy.samplers
+from .stream_attention import StreamCrossAttention, UNetBatchedStream
 
-class StreamDiffusionLatentBuffer(ControlNodeBase):
+
+class StreamDiffusionPipeline(ControlNodeBase):
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 **super().INPUT_TYPES()["required"],
                 "model": ("MODEL",),
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
                 "latents": ("LATENT",),
                 "t_index_list": ("STRING", {
                     "default": "0,16,32,45",
@@ -26,10 +30,26 @@ class StreamDiffusionLatentBuffer(ControlNodeBase):
                     "default": True,
                     "tooltip": "Whether to add noise to intermediate states"
                 }),
+                "cfg_type": (["none", "full", "self", "initialize"],),
+                "guidance_scale": ("FLOAT", {
+                    "default": 1.2,
+                    "min": 0.0,
+                    "max": 10.0,
+                    "step": 0.01,
+                    "tooltip": "How strong the guidance should be"
+                }),
+                "delta": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.01,
+                    "tooltip": "Scaling factor for residual noise"
+                }),
                 "scheduler": (comfy.samplers.SCHEDULER_NAMES, {
                     "default": "lcm",
                     "tooltip": "Which scheduler to use for noise scheduling"
                 }),
+                "sampler_name": (comfy.samplers.KSampler.SAMPLERS,),
                 "num_inference_steps": ("INT", {
                     "default": 50,
                     "min": 1,
@@ -40,13 +60,13 @@ class StreamDiffusionLatentBuffer(ControlNodeBase):
             }
         }
     
-    RETURN_TYPES = ("LATENT", "LATENT", "TIMESTEPS")
-    RETURN_NAMES = ("current_latents", "batched_latents", "timesteps")
+    RETURN_TYPES = ("LATENT",)
     FUNCTION = "update"
-    CATEGORY = "real-time/latents/streamdiffusion"
-    DESCRIPTION = "Buffers and processes latent frames for StreamDiffusion's batch denoising"
+    CATEGORY = "real-time/streamdiffusion"
+    DESCRIPTION = "StreamDiffusion pipeline with batched denoising and RCFG"
 
-    def update(self, model, latents, t_index_list, frame_buffer_size, do_add_noise, scheduler, num_inference_steps, always_execute=True):
+    def update(self, model, positive, negative, latents, t_index_list, frame_buffer_size, do_add_noise, 
+              cfg_type, guidance_scale, delta, scheduler, sampler_name, num_inference_steps, always_execute=True):
         state = self.get_state({
             "latent_buffer": None,  # Shape: [num_timesteps * frame_buffer_size, 4, H, W]
             "current_idx": 0,
@@ -54,7 +74,8 @@ class StreamDiffusionLatentBuffer(ControlNodeBase):
             "alpha_prod_t_sqrt": None,
             "beta_prod_t_sqrt": None,
             "init_noise": None,
-            "sigmas": None
+            "sigmas": None,
+            "stock_noise": None,  # For RCFG
         })
         
         # Get latent tensor from dict
@@ -103,13 +124,14 @@ class StreamDiffusionLatentBuffer(ControlNodeBase):
         # Calculate total buffer size based on timesteps and frame buffer
         total_buffer_size = len(state["t_indices"]) * frame_buffer_size
         
-        # Initialize buffer if needed
+        # Initialize buffers if needed
         if state["latent_buffer"] is None:
             state["latent_buffer"] = torch.zeros((total_buffer_size, *samples.shape[1:]), 
                                                dtype=samples.dtype,
                                                device=device)
-            # Initialize noise with proper seed for reproducibility
-            state["init_noise"] = torch.randn_like(state["latent_buffer"])
+            # Generate fixed noise pattern
+            state["init_noise"] = torch.randn(samples.shape, dtype=samples.dtype, device=device)
+            state["stock_noise"] = torch.zeros_like(samples)  # For RCFG
             state["current_idx"] = 0
         
         # Update buffer with current frame
@@ -121,227 +143,92 @@ class StreamDiffusionLatentBuffer(ControlNodeBase):
                 beta = state["beta_prod_t_sqrt"][i]
                 state["latent_buffer"][buffer_idx] = (
                     alpha * samples[0] +  # Scale clean latent
-                    beta * state["init_noise"][buffer_idx]  # Add scaled noise
+                    beta * state["init_noise"][0]  # Use fixed noise pattern
                 )
             else:
                 state["latent_buffer"][buffer_idx] = samples[0]
         
-        # Update index for next frame
-        state["current_idx"] = (state["current_idx"] + 1) % frame_buffer_size
-        self.set_state(state)
-        
-        # Return current frame, batched buffer and timesteps
-        batched = state["latent_buffer"].view(-1, *samples.shape[1:])  # Reshape to [total_buffer_size, 4, H, W]
-        
-        # Create timesteps tensor
+        # Create batched input for denoising
+        batched = state["latent_buffer"].view(-1, *samples.shape[1:])  # [total_buffer_size, 4, H, W]
         timesteps = torch.tensor(state["t_indices"], dtype=torch.long, device=device)
-        
-        return (
-            {"samples": samples},  # Current frame [1, 4, H, W]
-            {"samples": batched},  # Batched buffer [total_buffer_size, 4, H, W]
-            timesteps  # Timesteps tensor [num_timesteps]
-        )
-
-    @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        return super().IS_CHANGED(**kwargs)
-
-
-class StreamDiffusionRCFGGuider:
-    def __init__(self, model, cfg_type="self", guidance_scale=1.0, delta=1.0):
-        self.model = model
-        self.cfg_type = cfg_type
-        self.guidance_scale = guidance_scale
-        self.delta = delta
-        self.stock_noise = None
-        self.init_noise = None
-        
-    def __call__(self, x, timestep, cond, uncond, cfg_scale, model_options={}):
-        # Initialize stock noise if needed
-        if self.stock_noise is None:
-            self.stock_noise = torch.zeros_like(x)
-            self.init_noise = torch.randn_like(x)
-        
-        with torch.no_grad():
-            # Get conditional prediction
-            noise_pred_text = self.model.apply_model(x, timestep, cond)
-            
-            # Handle different CFG types
-            if self.cfg_type == "none" or cfg_scale <= 1.0:
-                return noise_pred_text
-            
-            if self.cfg_type == "full":
-                # Get unconditional prediction
-                noise_pred_uncond = self.model.apply_model(x, timestep, uncond)
-            elif self.cfg_type == "self" or self.cfg_type == "initialize":
-                # Use stock noise for unconditional
-                noise_pred_uncond = self.stock_noise * self.delta
-                # Update stock noise for next iteration
-                if self.cfg_type == "self":
-                    self.stock_noise = noise_pred_text.detach()
-                elif self.cfg_type == "initialize" and timestep == timestep[0]:  # First step
-                    self.stock_noise = noise_pred_text.detach()
-            
-            # Apply CFG
-            return noise_pred_uncond + cfg_scale * (noise_pred_text - noise_pred_uncond)
-
-class StreamDiffusionRCFG(ControlNodeBase):
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                **super().INPUT_TYPES()["required"],
-                "model": ("MODEL",),
-                "positive": ("CONDITIONING",),
-                "negative": ("CONDITIONING",),
-                "latents": ("LATENT",),
-                "timesteps": ("TIMESTEPS",),
-                "cfg_type": (["none", "full", "self", "initialize"],),
-                "guidance_scale": ("FLOAT", {
-                    "default": 1.2,
-                    "min": 0.0,
-                    "max": 10.0,
-                    "step": 0.01,
-                    "tooltip": "How strong the guidance should be"
-                }),
-                "delta": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.0,
-                    "max": 1.0,
-                    "step": 0.01,
-                    "tooltip": "Scaling factor for residual noise"
-                }),
-                "sampler_name": (comfy.samplers.KSampler.SAMPLERS,),
-                "scheduler": (comfy.samplers.SCHEDULER_NAMES,),
-                "steps": ("INT", {
-                    "default": 20,
-                    "min": 1,
-                    "max": 100,
-                    "step": 1
-                }),
-            }
-        }
-    
-    RETURN_TYPES = ("LATENT",)
-    FUNCTION = "update"
-    CATEGORY = "real-time/sampling/streamdiffusion"
-    DESCRIPTION = "Applies StreamDiffusion's Residual CFG optimizations to noise predictions"
-
-    def update(self, model, positive, negative, latents, timesteps, cfg_type, guidance_scale, delta, sampler_name, scheduler, steps, always_execute=True):
-        # Create RCFG guider
-        rcfg_guider = StreamDiffusionRCFGGuider(model.model, cfg_type, guidance_scale, delta)
         
         # Create sampler
         sampler = comfy.samplers.sampler_object(sampler_name)
         
-        # Calculate sigmas
-        sigmas = comfy.samplers.calculate_sigmas(
-            model.model.model_sampling,
-            scheduler,
-            steps
-        ).to(model.model.device)
-        
         # Get sigmas for selected timesteps
-        timestep_sigmas = sigmas[timesteps]
+        timestep_sigmas = state["sigmas"][timesteps]
         
-        # Sample with RCFG
-        samples = comfy.samplers.sample(
+        # Create custom CFG function for the sampler
+        def custom_cfg(x, t, cond, uncond, cfg_scale, model_options={}):
+            with torch.no_grad():
+                # Get conditional prediction
+                noise_pred_text = model.model.apply_model(x, t, cond)
+                
+                # Handle different CFG types
+                if cfg_type == "none" or cfg_scale <= 1.0:
+                    return noise_pred_text
+                
+                if cfg_type == "full":
+                    # Get unconditional prediction
+                    noise_pred_uncond = model.model.apply_model(x, t, uncond)
+                elif cfg_type == "self" or cfg_type == "initialize":
+                    # Use stock noise for unconditional
+                    noise_pred_uncond = state["stock_noise"] * delta
+                    # Update stock noise for next iteration
+                    if cfg_type == "self":
+                        state["stock_noise"] = noise_pred_text.detach()
+                    elif cfg_type == "initialize" and t == timesteps[0]:  # First step
+                        state["stock_noise"] = noise_pred_text.detach()
+                
+                # Apply CFG
+                return noise_pred_uncond + cfg_scale * (noise_pred_text - noise_pred_uncond)
+        
+        # Patch the attention layers first time
+        if not hasattr(self, "_attention_patched"):
+            StreamCrossAttention.initialize_attention()
+            self._attention_patched = True
+            
+        # Wrap model with batched stream handler
+        if not hasattr(model, "_stream_wrapped"):
+            model._stream_wrapped = UNetBatchedStream(model)
+            model.set_model_unet_function_wrapper(model._stream_wrapped)
+            
+        # Convert latent to BHWC format
+        samples = samples.permute(0, 2, 3, 1)  # BCHW -> BHWC
+        
+        # Modified denoising call:
+        denoised = comfy.samplers.sample(
             model,
-            latents["samples"],  # Use input as noise
-            positive, 
+            state["init_noise"].repeat(len(batched), 1, 1, 1),  
+            positive,
             negative,
             guidance_scale,
             model.model.device,
             sampler,
             timestep_sigmas,
-            model_options={"custom_cfg": rcfg_guider}  # Use our custom CFG
+            model_options={
+                "custom_cfg": custom_cfg,
+                "stream_batch": True  # Enable batched mode
+            },
+            latent_image=batched,
+            denoise_mask=None,
+            seed=None
         )
         
-        return ({"samples": samples},)
-
-    @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        return super().IS_CHANGED(**kwargs)
-
-
-class StreamDiffusionSampler(ControlNodeBase):
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                **super().INPUT_TYPES()["required"],
-                "model": ("MODEL",),
-                "positive": ("CONDITIONING",),
-                "negative": ("CONDITIONING",),
-                "latents": ("LATENT",),
-                "timesteps": ("TIMESTEPS",),
-                "sampler_name": (comfy.samplers.KSampler.SAMPLERS,),
-                "cfg": ("FLOAT", {
-                    "default": 8.0,
-                    "min": 0.0,
-                    "max": 100.0,
-                    "step": 0.1,
-                    "tooltip": "Classifier-free guidance scale"
-                }),
-                "num_inference_steps": ("INT", {
-                    "default": 50,
-                    "min": 1,
-                    "max": 100,
-                    "step": 1
-                }),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff})
-            }
-        }
-    
-    RETURN_TYPES = ("LATENT",)
-    FUNCTION = "update"
-    CATEGORY = "real-time/sampling"
-    DESCRIPTION = "StreamDiffusion's optimized sampler for real-time generation"
-
-    def update(self, model, positive, negative, latents, timesteps, sampler_name, cfg, num_inference_steps, seed, always_execute=True):
-        state = self.get_state({
-            "generator": None
-        })
-        
-        # Get input latents
-        x_t = latents["samples"]  # Shape: [batch_size, 4, H, W]
-        
-        # Initialize generator if needed
-        if state["generator"] is None:
-            state["generator"] = torch.Generator(device=model.model.device)
-            state["generator"].manual_seed(seed)
-        
-        # Get sampler object
-        sampler = comfy.samplers.sampler_object(sampler_name)
-        
-        # Calculate sigmas for timesteps
-        sigmas = comfy.samplers.calculate_sigmas(
-            model.model.model_sampling,
-            "exponential",  # Use exponential scheduler by default
-            num_inference_steps
-        ).to(model.model.device)
-        
-        # Get sigmas for selected timesteps
-        timestep_sigmas = sigmas[timesteps]
-        
-        # Sample using ComfyUI's infrastructure
-        samples = comfy.samplers.sample(
-            model, 
-            x_t,  # Use input latents as noise
-            positive, 
-            negative,
-            cfg,
-            model.model.device,
-            sampler,
-            timestep_sigmas,
-            denoise_mask=None,  # No mask support yet
-            seed=seed
-        )
-        
+        # Update index for next frame
+        state["current_idx"] = (state["current_idx"] + 1) % frame_buffer_size
         self.set_state(state)
         
-        return ({"samples": samples},)
+        # Return denoised result
+        return ({"samples": denoised[-1:]},)  # Return last frame
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
         return super().IS_CHANGED(**kwargs)
+
+    def terminate(self):
+        """Clean up when node is deleted"""
+        if hasattr(self, "_attention_patched"):
+            # Restore original attention implementation
+            from comfy.ldm.modules.attention import CrossAttention
+            CrossAttention.forward = StreamCrossAttention.original_attention
