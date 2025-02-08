@@ -90,7 +90,7 @@ class UNetBatchedStream:
         self.inner_model = model
         self.kv_cache = {}
         self.noise_base = None
-        self.current_channels = None  # Track channel count
+        self.current_channels = None
         
     def __call__(self, apply_model, args):
         """
@@ -108,13 +108,8 @@ class UNetBatchedStream:
         
         print(f"[DEBUG] Initial x stats - min: {x.min():.4f}, max: {x.max():.4f}, mean: {x.mean():.4f}")
         
-        # Always convert to BHWC regardless of channel count
-        if x.ndim == 4 and x.shape[1] != x.shape[-1]:  # BCHW format
-            x = x.permute(0, 2, 3, 1)
-            print(f"[DEBUG] After permute - min: {x.min():.4f}, max: {x.max():.4f}, mean: {x.mean():.4f}")
-            
-        # Get current channel count from LAST dimension
-        current_channels = x.shape[-1]
+        # Get current channel count from input
+        current_channels = x.shape[1]
         
         # Reinitialize noise base if channels change
         if self.current_channels != current_channels:
@@ -126,56 +121,31 @@ class UNetBatchedStream:
             self.noise_base = torch.randn_like(x)
             print(f"[DEBUG] Generated noise_base - min: {self.noise_base.min():.4f}, max: {self.noise_base.max():.4f}, mean: {self.noise_base.mean():.4f}")
             
-        # Apply noise blending
+        # Apply noise blending using ComfyUI's native sigma scheduling
         x = self.blend_noise(x, timestep)
         print(f"[DEBUG] After blend_noise - min: {x.min():.4f}, max: {x.max():.4f}, mean: {x.mean():.4f}")
         
-        # Convert back to BCHW for ComfyUI
-        x = x.permute(0, 3, 1, 2)
-        print(f"[DEBUG] Final x stats - min: {x.min():.4f}, max: {x.max():.4f}, mean: {x.mean():.4f}")
-        
-        # Extract tensors from conditioning
-        c_concat = c.get('c_concat', None)
-        if isinstance(c_concat, dict) and 'cond' in c_concat:
-            c_concat = c_concat['cond']
-            
-        c_crossattn = c.get('c_crossattn', None)
-        if isinstance(c_crossattn, dict) and 'cond' in c_crossattn:
-            c_crossattn = c_crossattn['cond']
-            
-        # Run through original apply_model with modified args
-        output = apply_model(
+        # Pass through model
+        return apply_model(
             x,
             timestep,
-            c_concat,
-            c_crossattn,
+            c_concat=c.get("c_concat"),
+            c_crossattn=c.get("c_crossattn"),
+            control=c.get("control"),
+            transformer_options=c.get("transformer_options", {}),
             cond_or_uncond=args.get("cond_or_uncond", None),
             kv_cache=self.kv_cache
-        )
-        print(f"[DEBUG] Output stats - min: {output.min():.4f}, max: {output.max():.4f}, mean: {output.mean():.4f}")
-        return output
-    
+        )    
     def blend_noise(self, x, timesteps):
-        """Handle different channel counts in noise blending"""
-        print(f"[DEBUG] x shape: {x.shape}")
-        print(f"[DEBUG] noise_base shape: {self.noise_base.shape if self.noise_base is not None else None}")
-        print(f"[DEBUG] x device: {x.device}")
-        print(f"[DEBUG] noise_base device: {self.noise_base.device if self.noise_base is not None else None}")
+        """ComfyUI-native noise blending"""
+        # Convert timesteps to sigmas (this matches ComfyUI's internal scheduling)
+        sigma = timesteps
         
-        # Ensure noise_base matches x's channels
-        if self.noise_base is None or self.noise_base.shape[-1] != x.shape[-1]:
-            print(f"[DEBUG] Regenerating noise_base to match shape")
-            self.noise_base = torch.randn_like(x)
-            print(f"[DEBUG] New noise_base shape: {self.noise_base.shape}")
-            
-        alpha = 1.0 / (1.0 + (timesteps / 0.1) ** 2)
-        print(f"[DEBUG] alpha value: {alpha}, shape: {alpha.shape if hasattr(alpha, 'shape') else 'scalar'}")
+        # Simple sigma-based noise mixing
+        noise_level = 1.0 / (1.0 + sigma)
+        noise_level = noise_level.reshape(-1, 1, 1, 1)
         
-        # Ensure alpha broadcasts correctly
-        if torch.is_tensor(alpha):
-            alpha = alpha.view(-1, 1, 1, 1)
-        else:
-            alpha = torch.tensor(alpha, device=x.device).view(-1, 1, 1, 1)
-            
-        print(f"[DEBUG] reshaped alpha shape: {alpha.shape}")
-        return alpha * x + (1 - alpha) * self.noise_base
+        # Mix clean latent with noise base
+        x = x * (1.0 - noise_level) + self.noise_base * noise_level
+        
+        return x
