@@ -75,16 +75,27 @@ class StreamDiffusionPipeline(ControlNodeBase):
             "stock_noise": None,  # For RCFG
             "timesteps": None,
             "current_buffer_size": None,  # Track buffer size
+            "current_settings": None,  # Track other settings
         })
         
         # Get latent tensor from dict
         samples = latents["samples"]  # Shape: [1, 4, H, W]
         device = samples.device
         
-        # Check if buffer size changed
-        if state["current_buffer_size"] != frame_buffer_size:
+        # Create current settings snapshot
+        current_settings = {
+            "t_index_list": t_index_list,
+            "scheduler": scheduler,
+            "num_inference_steps": num_inference_steps,
+        }
+        
+        # Check if settings changed
+        if (state["current_settings"] != current_settings or 
+            state["current_buffer_size"] != frame_buffer_size):
             state["latent_buffer"] = None  # Force reinitialization
+            state["sigmas"] = None  # Force scheduler reinitialization
             state["current_buffer_size"] = frame_buffer_size
+            state["current_settings"] = current_settings
             state["current_idx"] = 0
         
         # Initialize scheduler and timesteps if needed
