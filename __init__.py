@@ -21,7 +21,7 @@ NODE_CLASS_MAPPINGS = {
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
-    "ROINode": ROINode,
+    "ROINode": ROINode, 
     "QuickShapeMask": QuickShapeMask,
     "DTypeConverter": DTypeConverter,
     "FastWebcamCapture": FastWebcamCapture,
@@ -31,6 +31,8 @@ NODE_CLASS_MAPPINGS = {
     "StreamDiffusionSampler": StreamDiffusionSampler,
     "StreamDiffusionLatentBuffer": StreamDiffusionLatentBuffer,
 }       
+
+
 
 
 NODE_DISPLAY_NAME_MAPPINGS = {}
