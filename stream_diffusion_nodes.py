@@ -71,11 +71,9 @@ class StreamDiffusionPipeline(ControlNodeBase):
             "latent_buffer": None,  # Shape: [num_timesteps * frame_buffer_size, 4, H, W]
             "current_idx": 0,
             "t_indices": None,
-            "alpha_prod_t_sqrt": None,
-            "beta_prod_t_sqrt": None,
-            "init_noise": None,
             "sigmas": None,
             "stock_noise": None,  # For RCFG
+            "timesteps": None,
         })
         
         # Get latent tensor from dict
@@ -93,70 +91,49 @@ class StreamDiffusionPipeline(ControlNodeBase):
             state["sigmas"] = sigmas
             
             # Parse t_index_list and get timesteps
-            state["t_indices"] = [int(x.strip()) for x in t_index_list.split(",")]
+            t_indices = [int(x.strip()) for x in t_index_list.split(",")]
             
             # Get actual timesteps from scheduler
             timesteps = []
-            alpha_prod_t_sqrt_list = []
-            beta_prod_t_sqrt_list = []
+            for t_idx in t_indices:
+                timesteps.append(len(sigmas) - 1 - t_idx)
             
-            # Convert sigmas to timesteps and calculate alpha/beta
-            for t_idx in state["t_indices"]:
-                sigma = sigmas[t_idx]
-                # Convert sigma to timestep
-                timestep = len(sigmas) - 1 - t_idx
-                timesteps.append(timestep)
-                
-                # Calculate alpha/beta from sigma
-                alpha = 1.0 / (1.0 + sigma * sigma)
-                beta = sigma * sigma / (1.0 + sigma * sigma)
-                
-                alpha_prod_t_sqrt_list.append(alpha.sqrt())
-                beta_prod_t_sqrt_list.append(beta.sqrt())
-            
-            # Update t_indices to use actual timesteps
-            state["t_indices"] = timesteps
-            
-            # Stack and reshape for broadcasting
-            state["alpha_prod_t_sqrt"] = torch.stack(alpha_prod_t_sqrt_list).view(-1, 1, 1, 1).to(device)
-            state["beta_prod_t_sqrt"] = torch.stack(beta_prod_t_sqrt_list).view(-1, 1, 1, 1).to(device)
+            # Store timesteps for later use
+            state["timesteps"] = torch.tensor(timesteps, dtype=torch.long, device=device)
+            state["t_indices"] = torch.tensor(t_indices, dtype=torch.long, device=device)
         
         # Calculate total buffer size based on timesteps and frame buffer
-        total_buffer_size = len(state["t_indices"]) * frame_buffer_size
+        total_buffer_size = len(state["timesteps"]) * frame_buffer_size
         
         # Initialize buffers if needed
         if state["latent_buffer"] is None:
             state["latent_buffer"] = torch.zeros((total_buffer_size, *samples.shape[1:]), 
                                                dtype=samples.dtype,
                                                device=device)
-            # Generate fixed noise pattern
-            state["init_noise"] = torch.randn(samples.shape, dtype=samples.dtype, device=device)
-            state["stock_noise"] = torch.zeros_like(samples)  # For RCFG
+            # Initialize stock noise for RCFG
+            state["stock_noise"] = torch.zeros_like(samples)
             state["current_idx"] = 0
         
         # Update buffer with current frame
-        for i in range(len(state["t_indices"])):
+        for i in range(len(state["timesteps"])):
             buffer_idx = i * frame_buffer_size + (state["current_idx"] % frame_buffer_size)
             if do_add_noise:
-                # Add scaled noise using proper scheduler parameters
-                alpha = state["alpha_prod_t_sqrt"][i]
-                beta = state["beta_prod_t_sqrt"][i]
-                state["latent_buffer"][buffer_idx] = (
-                    alpha * samples[0] +  # Scale clean latent
-                    beta * state["init_noise"][0]  # Use fixed noise pattern
-                )
+                # Get sigma for current timestep
+                sigma = state["sigmas"][state["t_indices"][i]]
+                # Add noise using sigma scheduling
+                noise = torch.randn_like(samples)
+                state["latent_buffer"][buffer_idx] = samples[0] + noise[0] * sigma
             else:
                 state["latent_buffer"][buffer_idx] = samples[0]
         
         # Create batched input for denoising
-        batched = state["latent_buffer"].view(-1, *samples.shape[1:])  # [total_buffer_size, 4, H, W]
-        timesteps = torch.tensor(state["t_indices"], dtype=torch.long, device=device)
+        batched = state["latent_buffer"]  # Already in right shape [total_buffer_size, 4, H, W]
+        
+        # Get sigmas for selected timesteps
+        timestep_sigmas = state["sigmas"][state["t_indices"]]
         
         # Create sampler
         sampler = comfy.samplers.sampler_object(sampler_name)
-        
-        # Get sigmas for selected timesteps
-        timestep_sigmas = state["sigmas"][timesteps]
         
         # Create custom CFG function for the sampler
         def custom_cfg(x, t, cond, uncond, cfg_scale, model_options={}):
@@ -172,13 +149,14 @@ class StreamDiffusionPipeline(ControlNodeBase):
                     # Get unconditional prediction
                     noise_pred_uncond = model.model.apply_model(x, t, uncond)
                 elif cfg_type == "self" or cfg_type == "initialize":
-                    # Use stock noise for unconditional
-                    noise_pred_uncond = state["stock_noise"] * delta
+                    # Use stock noise for unconditional with delta scaling
+                    noise_pred_uncond = state["stock_noise"].repeat(x.shape[0], 1, 1, 1) * delta
                     # Update stock noise for next iteration
                     if cfg_type == "self":
-                        state["stock_noise"] = noise_pred_text.detach()
-                    elif cfg_type == "initialize" and t == timesteps[0]:  # First step
-                        state["stock_noise"] = noise_pred_text.detach()
+                        # Update per batch element
+                        state["stock_noise"] = noise_pred_text.reshape(-1, frame_buffer_size, *noise_pred_text.shape[1:])[-1]
+                    elif cfg_type == "initialize" and t == timestep_sigmas[0]:  # First step
+                        state["stock_noise"] = noise_pred_text[-1:]  # Use last prediction
                 
                 # Apply CFG
                 return noise_pred_uncond + cfg_scale * (noise_pred_text - noise_pred_uncond)
@@ -192,14 +170,11 @@ class StreamDiffusionPipeline(ControlNodeBase):
         if not hasattr(model, "_stream_wrapped"):
             model._stream_wrapped = UNetBatchedStream(model)
             model.set_model_unet_function_wrapper(model._stream_wrapped)
-            
-        # Convert latent to BHWC format
-        samples = samples.permute(0, 2, 3, 1)  # BCHW -> BHWC
         
         # Modified denoising call:
         denoised = comfy.samplers.sample(
             model,
-            state["init_noise"].repeat(len(batched), 1, 1, 1),  
+            torch.randn_like(batched),  # Fresh noise per batch
             positive,
             negative,
             guidance_scale,
