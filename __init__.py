@@ -3,9 +3,10 @@ from .controls.sequence_controls import FloatSequence, IntSequence, StringSequen
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText, LoadImageFromPath_
-from .stream_diffusion_nodes import StreamDiffusionRCFG, StreamDiffusionSampler, StreamDiffusionLatentBuffer
+from .stream_diffusion_nodes import   StreamDiffusionPipeline
 
 import re
+
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -27,10 +28,10 @@ NODE_CLASS_MAPPINGS = {
     "FastWebcamCapture": FastWebcamCapture,
     "MultilineText": MultilineText,
     "LoadImageFromPath_": LoadImageFromPath_,
-    "StreamDiffusionRCFG": StreamDiffusionRCFG,
-    "StreamDiffusionSampler": StreamDiffusionSampler,
-    "StreamDiffusionLatentBuffer": StreamDiffusionLatentBuffer,
+ 
+    "StreamDiffusionPipeline": StreamDiffusionPipeline,
 }       
+
 
 
 
