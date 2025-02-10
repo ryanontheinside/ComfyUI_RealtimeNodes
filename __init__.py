@@ -3,7 +3,7 @@ from .controls.sequence_controls import FloatSequence, IntSequence, StringSequen
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText, LoadImageFromPath_
-from .stream_diffusion_nodes import StreamConditioning, StreamCFG
+from .stream_diffusion_nodes import StreamConditioning, StreamCFG, StreamBatchSampler, StreamScheduler, StreamCrossAttention
 import re
 
 
@@ -19,11 +19,16 @@ NODE_CLASS_MAPPINGS = {
     "SimilarityFilter": SimilarityFilter,
     "StreamCFG": StreamCFG,
     "StreamConditioning": StreamConditioning,
+    "StreamBatchSampler": StreamBatchSampler,
+    "StreamScheduler": StreamScheduler,
+    "StreamCrossAttention": StreamCrossAttention,
     "LazyCondition": LazyCondition,
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
+
+
 
     "ROINode": ROINode,
 
