@@ -451,7 +451,18 @@ class StreamScheduler(ControlNodeBase):
 
 
 class StreamCrossAttention(ControlNodeBase):
-    """Implements optimized cross attention with KV-cache for real-time generation"""
+    """Implements optimized cross attention with KV-cache for real-time generation
+    
+    Paper reference: StreamDiffusion Section 3.5 "Pre-computation"
+    - Pre-computes and caches prompt embeddings
+    - Stores Key-Value pairs for reuse with static prompts
+    - Only recomputes KV pairs when prompt changes
+    
+    Additional optimizations beyond paper:
+    - QK normalization for better numerical stability
+    - Rotary position embeddings (RoPE) for improved temporal consistency
+    - Configurable context window size for memory/quality tradeoff
+    """
     
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "update"
@@ -464,22 +475,22 @@ class StreamCrossAttention(ControlNodeBase):
             "model": ("MODEL",),
             "qk_norm": ("BOOLEAN", {
                 "default": True,
-                "tooltip": "Whether to apply layer normalization to query and key tensors"
+                "tooltip": "Additional optimization: Whether to apply layer normalization to query and key tensors"
             }),
             "use_rope": ("BOOLEAN", {
                 "default": True,
-                "tooltip": "Whether to use rotary position embeddings for better temporal consistency"
+                "tooltip": "Additional optimization: Whether to use rotary position embeddings for better temporal consistency"
             }),
             "context_size": ("INT", {
                 "default": 4,
                 "min": 1,
                 "max": 32,
                 "step": 1,
-                "tooltip": "Maximum number of past frames to keep in context. Higher values use more memory but may improve temporal consistency."
+                "tooltip": "Additional optimization: Maximum number of past frames to keep in context. Higher values use more memory but may improve temporal consistency."
             }),
             "use_kv_cache": ("BOOLEAN", {
                 "default": True,
-                "tooltip": "Whether to cache key-value pairs for static prompts to avoid recomputation"
+                "tooltip": "Paper Section 3.5: Whether to cache key-value pairs for static prompts to avoid recomputation"
             }),
         })
         return inputs
@@ -494,21 +505,21 @@ class StreamCrossAttention(ControlNodeBase):
         
         # Get state with defaults
         state = self.get_state({
-            "qk_norm": qk_norm,
-            "use_rope": use_rope,
-            "context_size": context_size,
-            "use_kv_cache": use_kv_cache,
+            "qk_norm": qk_norm,  # Additional optimization
+            "use_rope": use_rope,  # Additional optimization
+            "context_size": context_size,  # Additional optimization
+            "use_kv_cache": use_kv_cache,  # From paper Section 3.5
             "workflow_count": 0,
-            "context_queue": [],  # Store past context tensors
-            "kv_cache": {},  # Store cached key-value pairs for each prompt
-            "last_prompt_embeds": None,  # Store last prompt embeddings for cache comparison
+            "context_queue": [],  # Additional: Store past context tensors for temporal consistency
+            "kv_cache": {},  # From paper Section 3.5: Cache KV pairs for each prompt
+            "last_prompt_embeds": None,  # From paper Section 3.5: For cache validation
         })
         
         def cross_attention_forward(module, x, context=None, mask=None, value=None):
             q = module.to_q(x)
             context = x if context is None else context
             
-            # Check if we can use cached KV pairs
+            # Paper Section 3.5: KV Caching Logic
             cache_hit = False
             if state["use_kv_cache"] and state["last_prompt_embeds"] is not None:
                 # Compare current context with cached prompt embeddings
@@ -519,31 +530,31 @@ class StreamCrossAttention(ControlNodeBase):
                         print("[StreamCrossAttention] Using cached KV pairs")
             
             if not cache_hit:
-                # Update context queue for temporal attention
+                # Additional optimization: Temporal context management
                 if len(state["context_queue"]) >= state["context_size"]:
                     state["context_queue"].pop(0)
                 state["context_queue"].append(context.detach().clone())
                 
-                # Concatenate current context with past contexts
+                # Additional optimization: Use past context for temporal consistency
                 full_context = torch.cat(state["context_queue"], dim=1)
                 
                 # Generate k/v for full context
                 k = module.to_k(full_context)
                 v = value if value is not None else module.to_v(full_context)
                 
-                # Cache KV pairs if this is a prompt context
+                # Paper Section 3.5: Cache KV pairs for static prompts
                 if state["use_kv_cache"]:
                     state["last_prompt_embeds"] = context.detach().clone()
                     state["kv_cache"][module] = (k.detach().clone(), v.detach().clone())
             
-            # Apply QK normalization if enabled
+            # Additional optimization: QK normalization
             if state["qk_norm"]:
                 q_norm = torch.nn.LayerNorm(q.shape[-1], device=q.device, dtype=q.dtype)
                 k_norm = torch.nn.LayerNorm(k.shape[-1], device=k.device, dtype=k.dtype)
                 q = q_norm(q)
                 k = k_norm(k)
             
-            # Apply rotary embeddings if enabled
+            # Additional optimization: Rotary position embeddings
             if state["use_rope"]:
                 # Calculate position embeddings
                 batch_size = q.shape[0]
@@ -587,7 +598,7 @@ class StreamCrossAttention(ControlNodeBase):
                 q = q_out
                 k = k_out
             
-            # Compute attention with optimized memory access pattern
+            # Standard attention computation with memory-efficient access pattern
             batch_size = q.shape[0]
             q_seq_len = q.shape[1]
             k_seq_len = k.shape[1]
