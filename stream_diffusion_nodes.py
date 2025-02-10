@@ -450,11 +450,8 @@ class StreamScheduler(ControlNodeBase):
         return (selected_sigmas,)
 
 
-
-
-
 class StreamCrossAttention(ControlNodeBase):
-    """Implements optimized cross attention for real-time generation"""
+    """Implements optimized cross attention with KV-cache for real-time generation"""
     
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "update"
@@ -473,6 +470,17 @@ class StreamCrossAttention(ControlNodeBase):
                 "default": True,
                 "tooltip": "Whether to use rotary position embeddings for better temporal consistency"
             }),
+            "context_size": ("INT", {
+                "default": 4,
+                "min": 1,
+                "max": 32,
+                "step": 1,
+                "tooltip": "Maximum number of past frames to keep in context. Higher values use more memory but may improve temporal consistency."
+            }),
+            "use_kv_cache": ("BOOLEAN", {
+                "default": True,
+                "tooltip": "Whether to cache key-value pairs for static prompts to avoid recomputation"
+            }),
         })
         return inputs
     
@@ -481,22 +489,52 @@ class StreamCrossAttention(ControlNodeBase):
         self.last_model_hash = None
         self.cross_attention_hook = None
 
-    def update(self, model, always_execute=True, qk_norm=True, use_rope=True):
-        print(f"[StreamCrossAttention] Initializing with qk_norm={qk_norm}, use_rope={use_rope}")
+    def update(self, model, always_execute=True, qk_norm=True, use_rope=True, context_size=4, use_kv_cache=True):
+        print(f"[StreamCrossAttention] Initializing with qk_norm={qk_norm}, use_rope={use_rope}, context_size={context_size}, use_kv_cache={use_kv_cache}")
         
         # Get state with defaults
         state = self.get_state({
             "qk_norm": qk_norm,
             "use_rope": use_rope,
+            "context_size": context_size,
+            "use_kv_cache": use_kv_cache,
             "workflow_count": 0,
+            "context_queue": [],  # Store past context tensors
+            "kv_cache": {},  # Store cached key-value pairs for each prompt
+            "last_prompt_embeds": None,  # Store last prompt embeddings for cache comparison
         })
         
         def cross_attention_forward(module, x, context=None, mask=None, value=None):
             q = module.to_q(x)
             context = x if context is None else context
-            k = module.to_k(context)
-            # Use provided value tensor if given, otherwise compute it
-            v = value if value is not None else module.to_v(context)
+            
+            # Check if we can use cached KV pairs
+            cache_hit = False
+            if state["use_kv_cache"] and state["last_prompt_embeds"] is not None:
+                # Compare current context with cached prompt embeddings
+                if torch.allclose(context, state["last_prompt_embeds"], rtol=1e-5, atol=1e-5):
+                    cache_hit = True
+                    k, v = state["kv_cache"].get(module, (None, None))
+                    if k is not None and v is not None:
+                        print("[StreamCrossAttention] Using cached KV pairs")
+            
+            if not cache_hit:
+                # Update context queue for temporal attention
+                if len(state["context_queue"]) >= state["context_size"]:
+                    state["context_queue"].pop(0)
+                state["context_queue"].append(context.detach().clone())
+                
+                # Concatenate current context with past contexts
+                full_context = torch.cat(state["context_queue"], dim=1)
+                
+                # Generate k/v for full context
+                k = module.to_k(full_context)
+                v = value if value is not None else module.to_v(full_context)
+                
+                # Cache KV pairs if this is a prompt context
+                if state["use_kv_cache"]:
+                    state["last_prompt_embeds"] = context.detach().clone()
+                    state["kv_cache"][module] = (k.detach().clone(), v.detach().clone())
             
             # Apply QK normalization if enabled
             if state["qk_norm"]:
@@ -510,49 +548,55 @@ class StreamCrossAttention(ControlNodeBase):
                 # Calculate position embeddings
                 batch_size = q.shape[0]
                 seq_len = q.shape[1]
+                full_seq_len = k.shape[1]  # Use full context length for k/v
                 dim = q.shape[2]
                 
-                # Create position indices
-                position = torch.arange(seq_len, device=q.device).unsqueeze(0).unsqueeze(-1)
-                position = position.repeat(batch_size, 1, dim//2)
+                # Create position indices for q and k separately
+                q_position = torch.arange(seq_len, device=q.device).unsqueeze(0).unsqueeze(-1)
+                k_position = torch.arange(full_seq_len, device=k.device).unsqueeze(0).unsqueeze(-1)
+                
+                q_position = q_position.repeat(batch_size, 1, dim//2)
+                k_position = k_position.repeat(batch_size, 1, dim//2)
                 
                 # Calculate frequencies
                 freq = 10000.0 ** (-torch.arange(0, dim//2, 2, device=q.device) / dim)
                 freq = freq.repeat((dim + 1) // 2)[:dim//2]
                 
                 # Calculate rotation angles
-                theta = position * freq
+                q_theta = q_position * freq
+                k_theta = k_position * freq
                 
-                # Apply rotations
-                cos = torch.cos(theta)
-                sin = torch.sin(theta)
-                
-                # Reshape q and k for rotation
+                # Apply rotations to q
+                q_cos = torch.cos(q_theta)
+                q_sin = torch.sin(q_theta)
                 q_reshaped = q.view(*q.shape[:-1], -1, 2)
-                k_reshaped = k.view(*k.shape[:-1], -1, 2)
-                
-                # Apply rotations
                 q_out = torch.cat([
-                    q_reshaped[..., 0] * cos - q_reshaped[..., 1] * sin,
-                    q_reshaped[..., 0] * sin + q_reshaped[..., 1] * cos
+                    q_reshaped[..., 0] * q_cos - q_reshaped[..., 1] * q_sin,
+                    q_reshaped[..., 0] * q_sin + q_reshaped[..., 1] * q_cos
                 ], dim=-1)
                 
+                # Apply rotations to k
+                k_cos = torch.cos(k_theta)
+                k_sin = torch.sin(k_theta)
+                k_reshaped = k.view(*k.shape[:-1], -1, 2)
                 k_out = torch.cat([
-                    k_reshaped[..., 0] * cos - k_reshaped[..., 1] * sin,
-                    k_reshaped[..., 0] * sin + k_reshaped[..., 1] * cos
+                    k_reshaped[..., 0] * k_cos - k_reshaped[..., 1] * k_sin,
+                    k_reshaped[..., 0] * k_sin + k_reshaped[..., 1] * k_cos
                 ], dim=-1)
                 
                 q = q_out
                 k = k_out
             
             # Compute attention with optimized memory access pattern
-            batch_size, seq_len = q.shape[0], q.shape[1]
+            batch_size = q.shape[0]
+            q_seq_len = q.shape[1]
+            k_seq_len = k.shape[1]
             head_dim = q.shape[-1] // module.heads
             
             # Reshape for multi-head attention
-            q = q.view(batch_size, seq_len, module.heads, head_dim)
-            k = k.view(batch_size, -1, module.heads, head_dim)
-            v = v.view(batch_size, -1, module.heads, head_dim)
+            q = q.view(batch_size, q_seq_len, module.heads, head_dim)
+            k = k.view(batch_size, k_seq_len, module.heads, head_dim)
+            v = v.view(batch_size, k_seq_len, module.heads, head_dim)
             
             # Transpose for attention computation
             q = q.transpose(1, 2)
@@ -572,7 +616,7 @@ class StreamCrossAttention(ControlNodeBase):
             
             # Reshape back
             out = out.transpose(1, 2).contiguous()
-            out = out.view(batch_size, seq_len, -1)
+            out = out.view(batch_size, q_seq_len, -1)
             
             # Project back to original dimension
             out = module.to_out[0](out)
