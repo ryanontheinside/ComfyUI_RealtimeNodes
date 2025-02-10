@@ -3,8 +3,10 @@ from .controls.sequence_controls import FloatSequence, IntSequence, StringSequen
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText, LoadImageFromPath_
-
+from .stream_diffusion_nodes import StreamConditioning, StreamCFG
 import re
+
+
 
 NODE_CLASS_MAPPINGS = {
     "FloatControl": FloatControl,
@@ -15,12 +17,16 @@ NODE_CLASS_MAPPINGS = {
     "StringSequence": StringSequence,
     "FPSMonitor": FPSMonitor,
     "SimilarityFilter": SimilarityFilter,
+    "StreamCFG": StreamCFG,
+    "StreamConditioning": StreamConditioning,
     "LazyCondition": LazyCondition,
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
+
     "ROINode": ROINode,
+
     #"IntervalControl": IntervalCo  ntrol,
     #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
