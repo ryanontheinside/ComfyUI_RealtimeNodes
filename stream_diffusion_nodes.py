@@ -5,11 +5,6 @@ import comfy.samplers
 import random
 
 class StreamCFG(ControlNodeBase):
-    """Implements CFG approaches for temporal consistency between workflow runs"""
-    
-    RETURN_TYPES = ("MODEL",)
-    FUNCTION = "update"
-    CATEGORY = "real-time/sampling"
     
     @classmethod
     def INPUT_TYPES(cls):
@@ -36,6 +31,11 @@ class StreamCFG(ControlNodeBase):
             }),
         })
         return inputs
+    
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "update"
+    CATEGORY = "real-time/sampling"
+    DESCRIPTION = "Implements CFG approaches as seen in StreamDiffusion for temporal consistency between workflow runs."
     
     def __init__(self):
         super().__init__()
@@ -228,7 +228,6 @@ class StreamCFG(ControlNodeBase):
 
 #NOTE: totally and utterly experimental. No theoretical backing whatsoever.
 class StreamConditioning(ControlNodeBase):
-    """Applies Residual CFG to conditioning for improved temporal consistency with different CFG types"""
     #NOTE: experimental
     @classmethod
     def INPUT_TYPES(s):
@@ -271,6 +270,7 @@ class StreamConditioning(ControlNodeBase):
     RETURN_NAMES = ("positive", "negative")
     FUNCTION = "update"
     CATEGORY = "real-time/control/utility"
+    DESCRIPTION = "Applies Residual CFG to conditioning for improved temporal consistency with different CFG types. This is totally and utterly experimental. No theoretical backing whatsoever."
 
     def __init__(self):
         super().__init__()
@@ -363,19 +363,17 @@ class StreamConditioning(ControlNodeBase):
         self.set_state(state)
         return (positive_out, negative_out)
 
-
 class StreamCrossAttention(ControlNodeBase):
     """Implements optimized cross attention with KV-cache for real-time generation
     
-    Paper reference: StreamDiffusion Section 3.5 "Pre-computation"
+    Core functionality from StreamDiffusion:
     - Pre-computes and caches prompt embeddings
     - Stores Key-Value pairs for reuse with static prompts
     - Only recomputes KV pairs when prompt changes
     
-    Additional optimizations beyond paper:
-    - QK normalization for better numerical stability
-    - Rotary position embeddings (RoPE) for improved temporal consistency
-    - Configurable context window size for memory/quality tradeoff
+    Additional optimizations beyond StreamDiffusion:
+    - QK normalization for better numerical stability (disabled by default)
+    - Rotary position embeddings (RoPE) for improved temporal consistency (disabled by default)
     """
     
     RETURN_TYPES = ("MODEL",)
@@ -387,24 +385,19 @@ class StreamCrossAttention(ControlNodeBase):
         inputs = super().INPUT_TYPES()
         inputs["required"].update({
             "model": ("MODEL",),
-            "qk_norm": ("BOOLEAN", {
+            # Core StreamDiffusion functionality
+            "use_kv_cache": ("BOOLEAN", {
                 "default": True,
+                "tooltip": "StreamDiffusion: Whether to cache key-value pairs for static prompts to avoid recomputation"
+            }),
+            # Additional optimizations (all disabled by default)
+            "qk_norm": ("BOOLEAN", {
+                "default": False,
                 "tooltip": "Additional optimization: Whether to apply layer normalization to query and key tensors"
             }),
             "use_rope": ("BOOLEAN", {
-                "default": True,
+                "default": False,
                 "tooltip": "Additional optimization: Whether to use rotary position embeddings for better temporal consistency"
-            }),
-            "context_size": ("INT", {
-                "default": 4,
-                "min": 1,
-                "max": 32,
-                "step": 1,
-                "tooltip": "Additional optimization: Maximum number of past frames to keep in context. Higher values use more memory but may improve temporal consistency."
-            }),
-            "use_kv_cache": ("BOOLEAN", {
-                "default": True,
-                "tooltip": "Paper Section 3.5: Whether to cache key-value pairs for static prompts to avoid recomputation"
             }),
         })
         return inputs
@@ -414,17 +407,15 @@ class StreamCrossAttention(ControlNodeBase):
         self.last_model_hash = None
         self.cross_attention_hook = None
 
-    def update(self, model, always_execute=True, qk_norm=True, use_rope=True, context_size=4, use_kv_cache=True):
-        print(f"[StreamCrossAttention] Initializing with qk_norm={qk_norm}, use_rope={use_rope}, context_size={context_size}, use_kv_cache={use_kv_cache}")
+    def update(self, model, always_execute=True, qk_norm=True, use_rope=True, use_kv_cache=True):
+        print(f"[StreamCrossAttention] Initializing with qk_norm={qk_norm}, use_rope={use_rope}, use_kv_cache={use_kv_cache}")
         
         # Get state with defaults
         state = self.get_state({
             "qk_norm": qk_norm,  # Additional optimization
             "use_rope": use_rope,  # Additional optimization
-            "context_size": context_size,  # Additional optimization
             "use_kv_cache": use_kv_cache,  # From paper Section 3.5
             "workflow_count": 0,
-            "context_queue": [],  # Additional: Store past context tensors for temporal consistency
             "kv_cache": {},  # From paper Section 3.5: Cache KV pairs for each prompt
             "last_prompt_embeds": None,  # From paper Section 3.5: For cache validation
         })
@@ -444,17 +435,9 @@ class StreamCrossAttention(ControlNodeBase):
                         print("[StreamCrossAttention] Using cached KV pairs")
             
             if not cache_hit:
-                # Additional optimization: Temporal context management
-                if len(state["context_queue"]) >= state["context_size"]:
-                    state["context_queue"].pop(0)
-                state["context_queue"].append(context.detach().clone())
-                
-                # Additional optimization: Use past context for temporal consistency
-                full_context = torch.cat(state["context_queue"], dim=1)
-                
-                # Generate k/v for full context
-                k = module.to_k(full_context)
-                v = value if value is not None else module.to_v(full_context)
+                # Generate k/v for current context
+                k = module.to_k(context)
+                v = value if value is not None else module.to_v(context)
                 
                 # Paper Section 3.5: Cache KV pairs for static prompts
                 if state["use_kv_cache"]:
@@ -473,44 +456,32 @@ class StreamCrossAttention(ControlNodeBase):
                 # Calculate position embeddings
                 batch_size = q.shape[0]
                 seq_len = q.shape[1]
-                full_seq_len = k.shape[1]  # Use full context length for k/v
                 dim = q.shape[2]
                 
-                # Create position indices for q and k separately
-                q_position = torch.arange(seq_len, device=q.device).unsqueeze(0).unsqueeze(-1)
-                k_position = torch.arange(full_seq_len, device=k.device).unsqueeze(0).unsqueeze(-1)
-                
-                q_position = q_position.repeat(batch_size, 1, dim//2)
-                k_position = k_position.repeat(batch_size, 1, dim//2)
+                # Create position indices
+                position = torch.arange(seq_len, device=q.device).unsqueeze(0).unsqueeze(-1)
+                position = position.repeat(batch_size, 1, dim//2)
                 
                 # Calculate frequencies
                 freq = 10000.0 ** (-torch.arange(0, dim//2, 2, device=q.device) / dim)
                 freq = freq.repeat((dim + 1) // 2)[:dim//2]
                 
                 # Calculate rotation angles
-                q_theta = q_position * freq
-                k_theta = k_position * freq
+                theta = position * freq
                 
-                # Apply rotations to q
-                q_cos = torch.cos(q_theta)
-                q_sin = torch.sin(q_theta)
-                q_reshaped = q.view(*q.shape[:-1], -1, 2)
-                q_out = torch.cat([
-                    q_reshaped[..., 0] * q_cos - q_reshaped[..., 1] * q_sin,
-                    q_reshaped[..., 0] * q_sin + q_reshaped[..., 1] * q_cos
-                ], dim=-1)
+                # Apply rotations to q and k
+                cos = torch.cos(theta)
+                sin = torch.sin(theta)
                 
-                # Apply rotations to k
-                k_cos = torch.cos(k_theta)
-                k_sin = torch.sin(k_theta)
-                k_reshaped = k.view(*k.shape[:-1], -1, 2)
-                k_out = torch.cat([
-                    k_reshaped[..., 0] * k_cos - k_reshaped[..., 1] * k_sin,
-                    k_reshaped[..., 0] * k_sin + k_reshaped[..., 1] * k_cos
-                ], dim=-1)
+                def rotate_half(x):
+                    x = x.view(*x.shape[:-1], -1, 2)
+                    return torch.cat([
+                        x[..., 0] * cos - x[..., 1] * sin,
+                        x[..., 0] * sin + x[..., 1] * cos
+                    ], dim=-1)
                 
-                q = q_out
-                k = k_out
+                q = rotate_half(q)
+                k = rotate_half(k)
             
             # Standard attention computation with memory-efficient access pattern
             batch_size = q.shape[0]
