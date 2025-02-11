@@ -6,7 +6,7 @@ import random
 
 
 class StreamBatchSampler(ControlNodeBase):
-    """Implements batched denoising for faster inference by processing multiple steps in parallel"""
+    """Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps"""
     
     RETURN_TYPES = ("SAMPLER",)
     FUNCTION = "update"
@@ -16,79 +16,100 @@ class StreamBatchSampler(ControlNodeBase):
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
         inputs["required"].update({
-            "batch_size": ("INT", {
-                "default": 2,
+            "num_steps": ("INT", {
+                "default": 4,
                 "min": 1,
                 "max": 10,
                 "step": 1,
-                "tooltip": "Number of steps to batch together. Higher values use more memory but are faster."
+                "tooltip": "Number of denoising steps. Should match the frame buffer size."
             }),
         })
         return inputs
     
     def __init__(self):
         super().__init__()
-        self.batch_size = None
+        self.num_steps = None
+        self.frame_buffer = []
+        self.x_t_latent_buffer = None
+        self.stock_noise = None
     
     def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
-        """Sample with batched denoising steps"""
+        """Sample with staggered batch denoising steps"""
         extra_args = {} if extra_args is None else extra_args
-        print(f"[StreamBatchSampler] Starting sampling with {len(sigmas)-1} steps, batch_size={self.batch_size}")
-        print(f"[StreamBatchSampler] Input noise shape: {noise.shape}, device: {noise.device}")
-        print(f"[StreamBatchSampler] Sigmas: {sigmas.tolist()}")
+        print(f"[StreamBatchSampler] Starting sampling with {len(sigmas)-1} steps")
         
-        # Prepare batched sampling
-        num_sigmas = len(sigmas) - 1
-        num_batches = (num_sigmas + self.batch_size - 1) // self.batch_size
-        x = noise
+        # Get number of frames in batch and available sigmas
+        batch_size = noise.shape[0]
+        num_sigmas = len(sigmas) - 1  # Subtract 1 because last sigma is the target (0.0)
         
-        for batch_idx in range(num_batches):
-            # Get sigmas for this batch
-            start_idx = batch_idx * self.batch_size
-            end_idx = min(start_idx + self.batch_size, num_sigmas)
-            batch_sigmas = sigmas[start_idx:end_idx+1]
-            print(f"\n[StreamBatchSampler] Batch {batch_idx+1}/{num_batches}")
-            print(f"[StreamBatchSampler] Processing steps {start_idx}-{end_idx}")
-            print(f"[StreamBatchSampler] Batch sigmas: {batch_sigmas.tolist()}")
+        print(f"[StreamBatchSampler] Input sigmas: {sigmas}")
+        print(f"[StreamBatchSampler] Input noise shape: {noise.shape}, min: {noise.min():.3f}, max: {noise.max():.3f}")
+        
+        # Verify batch size matches number of timesteps
+        if batch_size != num_sigmas:
+            raise ValueError(f"Batch size ({batch_size}) must match number of timesteps ({num_sigmas})")
+        
+        # Pre-compute alpha and beta terms
+        alpha_prod_t = (sigmas[:-1] / sigmas[0]).view(-1, 1, 1, 1)  # [B,1,1,1]
+        beta_prod_t = (1 - alpha_prod_t)
+        
+        print(f"[StreamBatchSampler] Alpha values: {alpha_prod_t.view(-1)}")
+        print(f"[StreamBatchSampler] Beta values: {beta_prod_t.view(-1)}")
+        
+        # Initialize stock noise if needed
+        if self.stock_noise is None:
+            self.stock_noise = torch.randn_like(noise[0])  # Random noise instead of zeros
+            print(f"[StreamBatchSampler] Initialized random stock noise with shape: {self.stock_noise.shape}")
             
-            # Create batch of identical latents
-            batch_size = end_idx - start_idx
-            x_batch = x.repeat(batch_size, 1, 1, 1)
+        # Scale noise for each frame based on its sigma
+        scaled_noise = []
+        for i in range(batch_size):
+            frame_noise = noise[i] + self.stock_noise * sigmas[i]  # Add scaled noise to input
+            scaled_noise.append(frame_noise)
+        x = torch.stack(scaled_noise, dim=0)
+        print(f"[StreamBatchSampler] Scaled noise shape: {x.shape}, min: {x.min():.3f}, max: {x.max():.3f}")
             
-            # Create batch of sigmas
-            sigma_batch = batch_sigmas[:-1]  # All but last sigma
+        # Initialize frame buffer if needed
+        if self.x_t_latent_buffer is None and num_sigmas > 1:
+            self.x_t_latent_buffer = x[0].clone()  # Initialize with noised first frame
+            print(f"[StreamBatchSampler] Initialized buffer with shape: {self.x_t_latent_buffer.shape}")
             
-            # Run model on entire batch at once
-            with torch.no_grad():
-                # Process all steps in parallel
-                denoised_batch = model(x_batch, sigma_batch, **extra_args)
-                print(f"[StreamBatchSampler] Denoised batch shape: {denoised_batch.shape}")
+        # Use buffer for first frame to maintain temporal consistency
+        if num_sigmas > 1:
+            x = torch.cat([self.x_t_latent_buffer.unsqueeze(0), x[1:]], dim=0)
+            print(f"[StreamBatchSampler] Combined with buffer, shape: {x.shape}")
+            
+        # Run model on entire batch at once
+        with torch.no_grad():
+            # Process all frames in parallel
+            sigma_batch = sigmas[:-1]
+            print(f"[StreamBatchSampler] Using sigmas for denoising: {sigma_batch}")
+            
+            denoised_batch = model(x, sigma_batch, **extra_args)
+            print(f"[StreamBatchSampler] Denoised batch shape: {denoised_batch.shape}")
+            print(f"[StreamBatchSampler] Denoised stats - min: {denoised_batch.min():.3f}, max: {denoised_batch.max():.3f}")
+            
+            # Update buffer with intermediate results
+            if num_sigmas > 1:
+                # Store result from first frame as buffer for next iteration
+                self.x_t_latent_buffer = denoised_batch[0].clone()
+                print(f"[StreamBatchSampler] Updated buffer with shape: {self.x_t_latent_buffer.shape}")
                 
-                # Process results one at a time to maintain callback
-                for i in range(batch_size):
-                    sigma = sigma_batch[i]
-                    sigma_next = batch_sigmas[i + 1]
-                    denoised = denoised_batch[i:i+1]
-                    
-                    # Calculate step size (now always positive as we go from high to low sigma)
-                    dt = sigma - sigma_next
-                    
-                    # Update x using Euler method
-                    # The (denoised - x) term gives us the direction to move
-                    # dt/sigma scales how far we move based on current noise level
-                    x = x + (denoised - x) * (dt / sigma)
-                    print(f"[StreamBatchSampler] Step {start_idx+i}: sigma={sigma:.4f}, next_sigma={sigma_next:.4f}, dt={dt:.4f}")
-                    
-                    # Call callback if provided
-                    if callback is not None:
-                        callback({'x': x, 'i': start_idx + i, 'sigma': sigma, 'sigma_hat': sigma, 'denoised': denoised})
+                # Return result from last frame
+                x_0_pred_out = denoised_batch[-1].unsqueeze(0)
+            else:
+                x_0_pred_out = denoised_batch
+                self.x_t_latent_buffer = None
+                
+            # Call callback if provided
+            if callback is not None:
+                callback({'x': x_0_pred_out, 'i': 0, 'sigma': sigmas[0], 'sigma_hat': sigmas[0], 'denoised': denoised_batch[-1:]})
         
-        print(f"\n[StreamBatchSampler] Sampling complete. Final x shape: {x.shape}")
-        return x
+        return x_0_pred_out
     
-    def update(self, batch_size=2, always_execute=True):
+    def update(self, num_steps=4, always_execute=True):
         """Create sampler with specified settings"""
-        self.batch_size = batch_size
+        self.num_steps = num_steps
         sampler = comfy.samplers.KSAMPLER(self.sample)
         return (sampler,)
 
@@ -122,7 +143,6 @@ class StreamScheduler(ControlNodeBase):
     def update(self, model, t_index_list="32,45", num_inference_steps=50, always_execute=True):
         # Get model's sampling parameters
         model_sampling = model.get_model_object("model_sampling")
-        print(f"[StreamScheduler] Model sampling max sigma: {model_sampling.sigma_max}, min sigma: {model_sampling.sigma_min}")
         
         # Parse timestep list
         try:
@@ -130,11 +150,9 @@ class StreamScheduler(ControlNodeBase):
         except ValueError as e:
             print(f"Error parsing timesteps: {e}. Using default [32,45]")
             t_index_list = [32, 45]
-        print(f"[StreamScheduler] Using timesteps: {t_index_list}")
-        
+            
         # Create full schedule using normal scheduler
         full_sigmas = comfy.samplers.normal_scheduler(model_sampling, num_inference_steps)
-        print(f"[StreamScheduler] Full sigma schedule: {full_sigmas.tolist()}")
         
         # Select only the sigmas at our desired indices, but in reverse order
         # This ensures we go from high noise to low noise
@@ -144,12 +162,65 @@ class StreamScheduler(ControlNodeBase):
                 print(f"Warning: timestep {t} out of range [0,{num_inference_steps}), skipping")
                 continue
             selected_sigmas.append(float(full_sigmas[t]))
-        print(f"[StreamScheduler] Selected sigmas: {selected_sigmas}")
-        
+            
         # Add final sigma
         selected_sigmas.append(0.0)
-        print(f"[StreamScheduler] Final sigma schedule: {selected_sigmas}")
         
         # Convert to tensor and move to appropriate device
         selected_sigmas = torch.FloatTensor(selected_sigmas).to(comfy.model_management.get_torch_device())
         return (selected_sigmas,)
+
+
+class StreamFrameBuffer(ControlNodeBase):
+    """Accumulates frames to enable staggered batch denoising like StreamDiffusion"""
+    
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "update"
+    CATEGORY = "real-time/sampling"
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        inputs = super().INPUT_TYPES()
+        inputs["required"].update({
+            "latent": ("LATENT",),
+            "buffer_size": ("INT", {
+                "default": 4,
+                "min": 1,
+                "max": 10,
+                "step": 1,
+                "tooltip": "Number of frames to buffer before starting batch processing. Should match number of denoising steps."
+            }),
+        })
+        return inputs
+    
+    def __init__(self):
+        super().__init__()
+        self.frame_buffer = []  # List to store incoming frames
+        self.buffer_size = None
+        
+    def update(self, latent, buffer_size=4, always_execute=True):
+        """Add new frame to buffer and return batch when ready"""
+        self.buffer_size = buffer_size
+        
+        # Extract latent tensor from input and remove batch dimension if present
+        x = latent["samples"]
+        if x.dim() == 4:  # [B,C,H,W]
+            x = x.squeeze(0)  # Remove batch dimension -> [C,H,W]
+        
+        # Add new frame to buffer
+        if len(self.frame_buffer) == 0:
+            # First frame - initialize buffer with copies
+            self.frame_buffer = [x.clone() for _ in range(self.buffer_size)]
+            print(f"[StreamFrameBuffer] Initialized buffer with {self.buffer_size} copies of first frame")
+        else:
+            # Shift frames forward and add new frame
+            self.frame_buffer.pop(0)  # Remove oldest frame
+            self.frame_buffer.append(x.clone())  # Add new frame
+            print(f"[StreamFrameBuffer] Added new frame to buffer")
+            
+        # Stack frames into batch
+        batch = torch.stack(self.frame_buffer, dim=0)  # [B,C,H,W]
+        print(f"[StreamFrameBuffer] Created batch with shape: {batch.shape}")
+        
+        # Return as latent dict
+        return ({"samples": batch},)
