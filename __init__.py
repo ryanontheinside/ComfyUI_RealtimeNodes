@@ -4,7 +4,7 @@ from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyConditi
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText, LoadImageFromPath_
 from .stream_diffusion_nodes import StreamConditioning, StreamCFG, StreamCrossAttention
-from .stream_sampler import StreamBatchSampler, StreamScheduler
+from .stream_sampler import  StreamBatchSampler, StreamScheduler, StreamFrameBuffer
 import re
 
 
@@ -22,13 +22,13 @@ NODE_CLASS_MAPPINGS = {
     "StreamConditioning": StreamConditioning,
     "StreamBatchSampler": StreamBatchSampler,
     "StreamScheduler": StreamScheduler,
+    "StreamFrameBuffer": StreamFrameBuffer,
     "StreamCrossAttention": StreamCrossAttention,
     "LazyCondition": LazyCondition,
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
-
 
 
     "ROINode": ROINode,
