@@ -3,6 +3,7 @@ from .base.control_base import ControlNodeBase
 import comfy.model_management
 import comfy.samplers
 import random
+from comfy.ldm.modules.attention import optimized_attention_for_device
 
 class StreamCFG(ControlNodeBase):
     
@@ -363,6 +364,8 @@ class StreamConditioning(ControlNodeBase):
         self.set_state(state)
         return (positive_out, negative_out)
 
+
+
 class StreamCrossAttention(ControlNodeBase):
     """Implements optimized cross attention with KV-cache for real-time generation
     
@@ -374,6 +377,7 @@ class StreamCrossAttention(ControlNodeBase):
     Additional optimizations beyond StreamDiffusion:
     - QK normalization for better numerical stability (disabled by default)
     - Rotary position embeddings (RoPE) for improved temporal consistency (disabled by default)
+    - ComfyUI's optimized attention implementation for device-specific optimizations (enabled by default)
     """
     
     RETURN_TYPES = ("MODEL",)
@@ -390,7 +394,11 @@ class StreamCrossAttention(ControlNodeBase):
                 "default": True,
                 "tooltip": "StreamDiffusion: Whether to cache key-value pairs for static prompts to avoid recomputation"
             }),
-            # Additional optimizations (all disabled by default)
+            # Additional optimizations
+            "use_optimized_attention": ("BOOLEAN", {
+                "default": True,
+                "tooltip": "Whether to use ComfyUI's optimized attention implementation for device-specific optimizations"
+            }),
             "qk_norm": ("BOOLEAN", {
                 "default": False,
                 "tooltip": "Additional optimization: Whether to apply layer normalization to query and key tensors"
@@ -407,17 +415,19 @@ class StreamCrossAttention(ControlNodeBase):
         self.last_model_hash = None
         self.cross_attention_hook = None
 
-    def update(self, model, always_execute=True, qk_norm=True, use_rope=True, use_kv_cache=True):
-        print(f"[StreamCrossAttention] Initializing with qk_norm={qk_norm}, use_rope={use_rope}, use_kv_cache={use_kv_cache}")
+    def update(self, model, always_execute=True, use_optimized_attention=True, qk_norm=False, use_rope=False, use_kv_cache=True):
+        print(f"[StreamCrossAttention] Initializing with use_optimized_attention={use_optimized_attention}, qk_norm={qk_norm}, use_rope={use_rope}, use_kv_cache={use_kv_cache}")
         
         # Get state with defaults
         state = self.get_state({
             "qk_norm": qk_norm,  # Additional optimization
             "use_rope": use_rope,  # Additional optimization
             "use_kv_cache": use_kv_cache,  # From paper Section 3.5
+            "use_optimized_attention": use_optimized_attention,  # ComfyUI optimization
             "workflow_count": 0,
             "kv_cache": {},  # From paper Section 3.5: Cache KV pairs for each prompt
             "last_prompt_embeds": None,  # From paper Section 3.5: For cache validation
+            "last_context_shape": None,  # Store context shape for validation
         })
         
         def cross_attention_forward(module, x, context=None, mask=None, value=None):
@@ -427,12 +437,19 @@ class StreamCrossAttention(ControlNodeBase):
             # Paper Section 3.5: KV Caching Logic
             cache_hit = False
             if state["use_kv_cache"] and state["last_prompt_embeds"] is not None:
-                # Compare current context with cached prompt embeddings
-                if torch.allclose(context, state["last_prompt_embeds"], rtol=1e-5, atol=1e-5):
-                    cache_hit = True
-                    k, v = state["kv_cache"].get(module, (None, None))
-                    if k is not None and v is not None:
-                        print("[StreamCrossAttention] Using cached KV pairs")
+                # Validate context shape first
+                current_shape = context.shape
+                if current_shape == state["last_context_shape"]:
+                    # Only compare content if shapes match
+                    try:
+                        if torch.allclose(context, state["last_prompt_embeds"], rtol=1e-5, atol=1e-5):
+                            cache_hit = True
+                            k, v = state["kv_cache"].get(module, (None, None))
+                            if k is not None and v is not None:
+                                print("[StreamCrossAttention] Using cached KV pairs")
+                    except:
+                        # If comparison fails, just regenerate KV pairs
+                        cache_hit = False
             
             if not cache_hit:
                 # Generate k/v for current context
@@ -442,6 +459,7 @@ class StreamCrossAttention(ControlNodeBase):
                 # Paper Section 3.5: Cache KV pairs for static prompts
                 if state["use_kv_cache"]:
                     state["last_prompt_embeds"] = context.detach().clone()
+                    state["last_context_shape"] = context.shape
                     state["kv_cache"][module] = (k.detach().clone(), v.detach().clone())
             
             # Additional optimization: QK normalization
@@ -483,36 +501,42 @@ class StreamCrossAttention(ControlNodeBase):
                 q = rotate_half(q)
                 k = rotate_half(k)
             
-            # Standard attention computation with memory-efficient access pattern
-            batch_size = q.shape[0]
-            q_seq_len = q.shape[1]
-            k_seq_len = k.shape[1]
-            head_dim = q.shape[-1] // module.heads
-            
-            # Reshape for multi-head attention
-            q = q.view(batch_size, q_seq_len, module.heads, head_dim)
-            k = k.view(batch_size, k_seq_len, module.heads, head_dim)
-            v = v.view(batch_size, k_seq_len, module.heads, head_dim)
-            
-            # Transpose for attention computation
-            q = q.transpose(1, 2)
-            k = k.transpose(1, 2)
-            v = v.transpose(1, 2)
-            
-            # Compute attention scores
-            scale = head_dim ** -0.5
-            scores = torch.matmul(q, k.transpose(-2, -1)) * scale
-            
-            if mask is not None:
-                scores = scores + mask
-            
-            # Apply attention
-            attn = torch.softmax(scores, dim=-1)
-            out = torch.matmul(attn, v)
-            
-            # Reshape back
-            out = out.transpose(1, 2).contiguous()
-            out = out.view(batch_size, q_seq_len, -1)
+            # Use optimized attention if enabled
+            if state["use_optimized_attention"]:
+                # Let ComfyUI choose the best attention implementation
+                attn_func = optimized_attention_for_device(q.device)
+                out = attn_func(q, k, v, module.heads, mask=mask)
+            else:
+                # Standard attention computation with memory-efficient access pattern
+                batch_size = q.shape[0]
+                q_seq_len = q.shape[1]
+                k_seq_len = k.shape[1]
+                head_dim = q.shape[-1] // module.heads
+                
+                # Reshape for multi-head attention
+                q = q.view(batch_size, q_seq_len, module.heads, head_dim)
+                k = k.view(batch_size, k_seq_len, module.heads, head_dim)
+                v = v.view(batch_size, k_seq_len, module.heads, head_dim)
+                
+                # Transpose for attention computation
+                q = q.transpose(1, 2)
+                k = k.transpose(1, 2)
+                v = v.transpose(1, 2)
+                
+                # Compute attention scores
+                scale = head_dim ** -0.5
+                scores = torch.matmul(q, k.transpose(-2, -1)) * scale
+                
+                if mask is not None:
+                    scores = scores + mask
+                
+                # Apply attention
+                attn = torch.softmax(scores, dim=-1)
+                out = torch.matmul(attn, v)
+                
+                # Reshape back
+                out = out.transpose(1, 2).contiguous()
+                out = out.view(batch_size, q_seq_len, -1)
             
             # Project back to original dimension
             out = module.to_out[0](out)
