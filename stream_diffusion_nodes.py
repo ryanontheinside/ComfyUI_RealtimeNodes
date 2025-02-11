@@ -73,12 +73,21 @@ class StreamCFG(ControlNodeBase):
             uncond_denoised = args["uncond_denoised"]
             cond_scale = args["cond_scale"]
             
+            # Debug prints for tensor stats
+            print(f"\n[StreamCFG Debug] Step Info:")
+            print(f"- Workflow count: {state['workflow_count']}")
+            print(f"- CFG Type: {state['cfg_type']}")
+            print(f"- Tensor Stats:")
+            print(f"  - denoised shape: {denoised.shape}, range: [{denoised.min():.3f}, {denoised.max():.3f}]")
+            print(f"  - uncond_denoised shape: {uncond_denoised.shape}, range: [{uncond_denoised.min():.3f}, {uncond_denoised.max():.3f}]")
+            if state["last_uncond"] is not None:
+                print(f"  - last_uncond shape: {state['last_uncond'].shape}, range: [{state['last_uncond'].min():.3f}, {state['last_uncond'].max():.3f}]")
+            
             # Handle both batched and single sigmas
             sigma = args["sigma"]
             if torch.is_tensor(sigma):
-                # For batched sampling, use first sigma in batch
-                # This is safe because we process in order and track seen sigmas
                 sigma = sigma[0].item() if len(sigma.shape) > 0 else sigma.item()
+            print(f"- Current sigma: {sigma:.6f}")
             
             # Get step info from model options
             model_options = args["model_options"]
@@ -86,12 +95,12 @@ class StreamCFG(ControlNodeBase):
             
             # Update current sigmas if needed
             if sample_sigmas is not None and state["current_sigmas"] is None:
-                # Filter out the trailing 0.0 if present
                 sigmas = [s.item() for s in sample_sigmas]
                 if sigmas[-1] == 0.0:
                     sigmas = sigmas[:-1]
                 state["current_sigmas"] = sigmas
                 state["seen_sigmas"] = set()
+                print(f"- New sigma sequence: {sigmas}")
                 
                 # Calculate paper's exact scaling factors
                 state["alpha_prod_t"] = torch.tensor([1.0 / (1.0 + s**2) for s in sigmas], 
@@ -104,6 +113,12 @@ class StreamCFG(ControlNodeBase):
                     device=denoised.device, dtype=denoised.dtype)
                 state["c_out"] = torch.tensor([-s / torch.sqrt(torch.tensor(s**2 + 1.0)) for s in sigmas],
                     device=denoised.device, dtype=denoised.dtype)
+                
+                print(f"- Scaling factors for first step:")
+                print(f"  alpha: {state['alpha_prod_t'][0]:.6f}")
+                print(f"  beta: {state['beta_prod_t'][0]:.6f}")
+                print(f"  c_skip: {state['c_skip'][0]:.6f}")
+                print(f"  c_out: {state['c_out'][0]:.6f}")
             
             # Track this sigma
             state["seen_sigmas"].add(sigma)
@@ -117,6 +132,8 @@ class StreamCFG(ControlNodeBase):
                 if not is_last_step and sigma == min(state["current_sigmas"]):
                     is_last_step = True
                 state["is_last_step"] = is_last_step
+                print(f"- Is last step: {is_last_step}")
+                print(f"- Seen sigmas: {sorted(state['seen_sigmas'])}")
             
             # First workflow case
             if state["last_uncond"] is None:
@@ -127,6 +144,7 @@ class StreamCFG(ControlNodeBase):
                     if cfg_type == "initialize":
                         state["initialized"] = True
                     self.set_state(state)
+                    print("- First workflow complete, stored last_uncond")
                 return denoised
             
             # Handle different CFG types
@@ -139,18 +157,24 @@ class StreamCFG(ControlNodeBase):
                     self.set_state(state)
             else:  # self or initialized initialize
                 current_idx = len(state["seen_sigmas"]) - 1
+                print(f"- Current step index: {current_idx}")
                 
                 # Use paper's exact formulation for noise prediction
-                noise_pred_uncond = state["last_uncond"] * delta
+                noise_pred_uncond = state["last_uncond"] * state["delta"]
+                print(f"- Scaled noise prediction range: [{noise_pred_uncond.min():.3f}, {noise_pred_uncond.max():.3f}]")
                 
                 # Apply CFG with scaled prediction
-                result = noise_pred_uncond + cond_scale * (cond_denoised - noise_pred_uncond)
+                result = noise_pred_uncond + cond_scale * (cond_denoised - noise_pred_uncond) * state["residual_scale"]
+                print(f"- Result range after CFG: [{result.min():.3f}, {result.max():.3f}]")
                 
                 # Store last prediction if this is the last step
                 if state["is_last_step"]:
                     # Calculate F_theta using paper's formulation
                     F_theta = (uncond_denoised - state["beta_prod_t"][current_idx] * noise_pred_uncond) / state["alpha_prod_t"][current_idx]
+                    print(f"- F_theta range: [{F_theta.min():.3f}, {F_theta.max():.3f}]")
+                    
                     delta_x = state["c_out"][current_idx] * F_theta + state["c_skip"][current_idx] * uncond_denoised
+                    print(f"- delta_x range: [{delta_x.min():.3f}, {delta_x.max():.3f}]")
                     
                     # Scale delta_x with next step's coefficients
                     if current_idx < len(state["current_sigmas"]) - 1:
@@ -159,12 +183,20 @@ class StreamCFG(ControlNodeBase):
                     else:
                         next_alpha = torch.ones_like(state["alpha_prod_t"][0])
                         next_beta = torch.zeros_like(state["beta_prod_t"][0])
+                    print(f"- Next step coefficients - alpha: {next_alpha:.6f}, beta: {next_beta:.6f}")
                     
                     # Update stored prediction with properly scaled residual
-                    final_update = (next_alpha * delta_x) / next_beta
-                    if next_beta > 0:  # Add noise only when beta > 0
-                        final_update = final_update + torch.randn_like(delta_x) * (1 - next_alpha**2).sqrt()
+                    if next_beta > 0:
+                        final_update = (next_alpha * delta_x) / next_beta
+                        # Add noise only when beta > 0
+                        noise = torch.randn_like(delta_x) * (1 - next_alpha**2).sqrt()
+                        final_update = final_update + noise
+                        print(f"- Added noise range: [{noise.min():.3f}, {noise.max():.3f}]")
+                    else:
+                        # For the last step, just use the current prediction
+                        final_update = uncond_denoised
                     
+                    print(f"- Final update range: [{final_update.min():.3f}, {final_update.max():.3f}]")
                     state["last_uncond"] = final_update
                     state["workflow_count"] += 1
                     state["current_sigmas"] = None
