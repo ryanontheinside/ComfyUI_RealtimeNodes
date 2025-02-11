@@ -3,7 +3,8 @@ from .controls.sequence_controls import FloatSequence, IntSequence, StringSequen
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare, TextRenderer, QuickShapeMask,  MultilineText, LoadImageFromPath_
-from .stream_diffusion_nodes import StreamConditioning, StreamCFG, StreamBatchSampler, StreamScheduler, StreamCrossAttention
+from .stream_diffusion_nodes import StreamConditioning, StreamCFG, StreamCrossAttention
+from .stream_sampler import StreamBatchSampler, StreamScheduler
 import re
 
 
