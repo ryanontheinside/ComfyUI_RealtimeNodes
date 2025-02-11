@@ -48,17 +48,20 @@ class StreamCFG(ControlNodeBase):
         
         # Get state with defaults
         state = self.get_state({
-            "last_uncond": None,  # Store last workflow's unconditioned prediction
+            "last_uncond": None,
             "initialized": False,
             "cfg_type": cfg_type,
             "residual_scale": residual_scale,
             "delta": delta,
-            "workflow_count": 0,  # Track number of workflow runs
-            "current_sigmas": None,  # Track sigmas for this workflow
-            "seen_sigmas": set(),  # Track which sigmas we've seen this workflow
-            "is_last_step": False,  # Track if we're on the last step
-            "alpha_prod_t": None,  # Store alpha values for proper scaling
-            "beta_prod_t": None,  # Store beta values for proper scaling
+            "workflow_count": 0,
+            "current_sigmas": None,
+            "seen_sigmas": set(),
+            "is_last_step": False,
+            # Add new state variables for proper scaling
+            "alpha_prod_t": None,
+            "beta_prod_t": None,
+            "c_skip": None,
+            "c_out": None,
         })
         
         def post_cfg_function(args):
@@ -90,10 +93,17 @@ class StreamCFG(ControlNodeBase):
                 state["current_sigmas"] = sigmas
                 state["seen_sigmas"] = set()
                 
-                # Calculate alpha and beta values for proper scaling
-                alphas = [1.0 / (1.0 + s**2) for s in sigmas]
-                state["alpha_prod_t"] = torch.tensor(alphas, device=denoised.device, dtype=denoised.dtype)
-                state["beta_prod_t"] = torch.sqrt(1 - state["alpha_prod_t"])
+                # Calculate paper's exact scaling factors
+                state["alpha_prod_t"] = torch.tensor([1.0 / (1.0 + s**2) for s in sigmas], 
+                    device=denoised.device, dtype=denoised.dtype)
+                state["beta_prod_t"] = torch.tensor([s / (1.0 + s**2) for s in sigmas],
+                    device=denoised.device, dtype=denoised.dtype)
+                
+                # Calculate c_skip and c_out coefficients
+                state["c_skip"] = torch.tensor([1.0 / (s**2 + 1.0) for s in sigmas],
+                    device=denoised.device, dtype=denoised.dtype)
+                state["c_out"] = torch.tensor([-s / torch.sqrt(torch.tensor(s**2 + 1.0)) for s in sigmas],
+                    device=denoised.device, dtype=denoised.dtype)
             
             # Track this sigma
             state["seen_sigmas"].add(sigma)
@@ -113,27 +123,24 @@ class StreamCFG(ControlNodeBase):
                 if state["is_last_step"]:
                     state["last_uncond"] = uncond_denoised.detach().clone()
                     state["workflow_count"] += 1
-                    state["current_sigmas"] = None  # Reset for next workflow
+                    state["current_sigmas"] = None
                     if cfg_type == "initialize":
                         state["initialized"] = True
                     self.set_state(state)
                 return denoised
             
-            # Handle different CFG types for subsequent workflows
+            # Handle different CFG types
             if cfg_type == "full":
                 result = denoised
-                
             elif cfg_type == "initialize" and not state["initialized"]:
                 result = denoised
                 if state["is_last_step"]:
                     state["initialized"] = True
                     self.set_state(state)
-                
             else:  # self or initialized initialize
-                # Get current step index
                 current_idx = len(state["seen_sigmas"]) - 1
                 
-                # Scale last prediction with proper alpha/beta values
+                # Use paper's exact formulation for noise prediction
                 noise_pred_uncond = state["last_uncond"] * delta
                 
                 # Apply CFG with scaled prediction
@@ -141,25 +148,26 @@ class StreamCFG(ControlNodeBase):
                 
                 # Store last prediction if this is the last step
                 if state["is_last_step"]:
-                    # Calculate properly scaled residual
-                    scaled_noise = state["beta_prod_t"][current_idx] * state["last_uncond"]
-                    delta_x = uncond_denoised - scaled_noise
+                    # Calculate F_theta using paper's formulation
+                    F_theta = (uncond_denoised - state["beta_prod_t"][current_idx] * noise_pred_uncond) / state["alpha_prod_t"][current_idx]
+                    delta_x = state["c_out"][current_idx] * F_theta + state["c_skip"][current_idx] * uncond_denoised
                     
-                    # Scale delta_x with next step's alpha/beta
+                    # Scale delta_x with next step's coefficients
                     if current_idx < len(state["current_sigmas"]) - 1:
-                        alpha_next = state["alpha_prod_t"][current_idx + 1]
-                        beta_next = state["beta_prod_t"][current_idx + 1]
+                        next_alpha = state["alpha_prod_t"][current_idx + 1]
+                        next_beta = state["beta_prod_t"][current_idx + 1]
                     else:
-                        alpha_next = torch.ones_like(state["alpha_prod_t"][0])
-                        beta_next = torch.ones_like(state["beta_prod_t"][0])
+                        next_alpha = torch.ones_like(state["alpha_prod_t"][0])
+                        next_beta = torch.zeros_like(state["beta_prod_t"][0])
                     
-                    delta_x = alpha_next * delta_x / beta_next
+                    # Update stored prediction with properly scaled residual
+                    final_update = (next_alpha * delta_x) / next_beta
+                    if next_beta > 0:  # Add noise only when beta > 0
+                        final_update = final_update + torch.randn_like(delta_x) * (1 - next_alpha**2).sqrt()
                     
-                    # Update stored prediction with scaled residual
-                    final_update = uncond_denoised + residual_scale * delta_x
                     state["last_uncond"] = final_update
                     state["workflow_count"] += 1
-                    state["current_sigmas"] = None  # Reset for next workflow
+                    state["current_sigmas"] = None
                     self.set_state(state)
             
             return result
