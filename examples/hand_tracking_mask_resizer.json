@@ -1,0 +1,122 @@
+{
+  "7": {
+    "inputs": {
+      "detection_confidence": 0.3,
+      "tracking_confidence": 0.3,
+      "max_num_hands": 2,
+      "static_image_mode": false,
+      "draw_debug": true,
+      "image": [
+        "23",
+        0
+      ]
+    },
+    "class_type": "HandTrackingNode",
+    "_meta": {
+      "title": "Hand Tracking Node 🕒🅡🅣🅝"
+    }
+  },
+  "8": {
+    "inputs": {
+      "mask_type": "full_hand",
+      "image": [
+        "7",
+        0
+      ],
+      "hand_data": [
+        "7",
+        1
+      ]
+    },
+    "class_type": "HandMaskNode",
+    "_meta": {
+      "title": "Hand Mask Node 🕒🅡🅣🅝"
+    }
+  },
+  "9": {
+    "inputs": {
+      "mask": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "MaskToImage",
+    "_meta": {
+      "title": "Convert Mask to Image"
+    }
+  },
+  "11": {
+    "inputs": {
+      "always_execute": true,
+      "trigger": false
+    },
+    "class_type": "StateResetNode",
+    "_meta": {
+      "title": "State Reset Node 🕒🅡🅣🅝"
+    }
+  },
+  "17": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "7",
+        0
+      ],
+      "source": [
+        "9",
+        0
+      ],
+      "mask": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "22": {
+    "inputs": {
+      "always_execute": true,
+      "x_pos": 0.5,
+      "y_pos": 0.44,
+      "size": 0.2,
+      "min_size": 0.1,
+      "max_size": 0.26,
+      "resize_strength": 1,
+      "input_mask": [
+        "8",
+        1
+      ]
+    },
+    "class_type": "ResizeMaskNode",
+    "_meta": {
+      "title": "Resize Mask Node 🕒🅡🅣🅝"
+    }
+  },
+  "23": {
+    "inputs": {
+      "image": "dead_inside_512.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "24": {
+    "inputs": {
+      "images": [
+        "17",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  }
+}
