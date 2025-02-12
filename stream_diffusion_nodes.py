@@ -21,7 +21,7 @@ class StreamCFG(ControlNodeBase):
                 "tooltip": "Type of CFG to use: full (standard), self (memory efficient), or initialize (memory efficient with initialization)"
             }),
             "residual_scale": ("FLOAT", {
-                "default": 0.4,
+                "default": 0.7,
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.01,
@@ -39,14 +39,12 @@ class StreamCFG(ControlNodeBase):
     
     def __init__(self):
         super().__init__()
-        # Store the last model to detect when we need to reapply the hook
         self.last_model_hash = None
         self.post_cfg_function = None
 
-    def update(self, model, always_execute=True, cfg_type="self", residual_scale=0.4, delta=1.0):
+    def update(self, model, always_execute=True, cfg_type="self", residual_scale=0.7, delta=1.0):
         print(f"[StreamCFG] Initializing with cfg_type={cfg_type}, residual_scale={residual_scale}, delta={delta}")
         
-        # Get state with defaults
         state = self.get_state({
             "last_uncond": None,
             "initialized": False,
@@ -57,15 +55,14 @@ class StreamCFG(ControlNodeBase):
             "current_sigmas": None,
             "seen_sigmas": set(),
             "is_last_step": False,
-            # Add new state variables for proper scaling
             "alpha_prod_t": None,
             "beta_prod_t": None,
             "c_skip": None,
             "c_out": None,
+            "last_noise": None,  # Store noise from previous frame
         })
         
         def post_cfg_function(args):
-            # Extract info
             denoised = args["denoised"]
             cond = args["cond"]
             uncond = args["uncond"]
@@ -73,7 +70,6 @@ class StreamCFG(ControlNodeBase):
             uncond_denoised = args["uncond_denoised"]
             cond_scale = args["cond_scale"]
             
-            # Debug prints for tensor stats
             print(f"\n[StreamCFG Debug] Step Info:")
             print(f"- Workflow count: {state['workflow_count']}")
             print(f"- CFG Type: {state['cfg_type']}")
@@ -83,17 +79,14 @@ class StreamCFG(ControlNodeBase):
             if state["last_uncond"] is not None:
                 print(f"  - last_uncond shape: {state['last_uncond'].shape}, range: [{state['last_uncond'].min():.3f}, {state['last_uncond'].max():.3f}]")
             
-            # Handle both batched and single sigmas
             sigma = args["sigma"]
             if torch.is_tensor(sigma):
                 sigma = sigma[0].item() if len(sigma.shape) > 0 else sigma.item()
             print(f"- Current sigma: {sigma:.6f}")
             
-            # Get step info from model options
             model_options = args["model_options"]
             sample_sigmas = model_options["transformer_options"].get("sample_sigmas", None)
             
-            # Update current sigmas if needed
             if sample_sigmas is not None and state["current_sigmas"] is None:
                 sigmas = [s.item() for s in sample_sigmas]
                 if sigmas[-1] == 0.0:
@@ -102,13 +95,11 @@ class StreamCFG(ControlNodeBase):
                 state["seen_sigmas"] = set()
                 print(f"- New sigma sequence: {sigmas}")
                 
-                # Calculate paper's exact scaling factors
                 state["alpha_prod_t"] = torch.tensor([1.0 / (1.0 + s**2) for s in sigmas], 
                     device=denoised.device, dtype=denoised.dtype)
                 state["beta_prod_t"] = torch.tensor([s / (1.0 + s**2) for s in sigmas],
                     device=denoised.device, dtype=denoised.dtype)
                 
-                # Calculate c_skip and c_out coefficients
                 state["c_skip"] = torch.tensor([1.0 / (s**2 + 1.0) for s in sigmas],
                     device=denoised.device, dtype=denoised.dtype)
                 state["c_out"] = torch.tensor([-s / torch.sqrt(torch.tensor(s**2 + 1.0)) for s in sigmas],
@@ -119,16 +110,26 @@ class StreamCFG(ControlNodeBase):
                 print(f"  beta: {state['beta_prod_t'][0]:.6f}")
                 print(f"  c_skip: {state['c_skip'][0]:.6f}")
                 print(f"  c_out: {state['c_out'][0]:.6f}")
+                
+                # Initialize noise for first step using previous frame if available
+                if state["last_uncond"] is not None and state["last_noise"] is not None:
+                    # Scale noise based on current sigma
+                    current_sigma = torch.tensor(sigmas[0], device=denoised.device, dtype=denoised.dtype)
+                    scaled_noise = state["last_noise"] * current_sigma
+                    
+                    # Mix with previous frame prediction
+                    alpha = 1.0 / (1.0 + current_sigma**2)
+                    noisy_input = alpha * state["last_uncond"] + (1 - alpha) * scaled_noise
+                    
+                    # Update model input
+                    if "input" in model_options:
+                        model_options["input"] = noisy_input
+                    print(f"- Initialized with previous frame, noise scale: {current_sigma:.6f}")
             
-            # Track this sigma
             state["seen_sigmas"].add(sigma)
-            
-            # Check if this is the last step
             state["is_last_step"] = False
             if state["current_sigmas"] is not None:
-                # It's the last step if we've seen all sigmas
                 is_last_step = len(state["seen_sigmas"]) >= len(state["current_sigmas"])
-                # Or if this is the smallest sigma in the sequence
                 if not is_last_step and sigma == min(state["current_sigmas"]):
                     is_last_step = True
                 state["is_last_step"] = is_last_step
@@ -139,68 +140,44 @@ class StreamCFG(ControlNodeBase):
             if state["last_uncond"] is None:
                 if state["is_last_step"]:
                     state["last_uncond"] = uncond_denoised.detach().clone()
+                    # Store noise for next frame initialization
+                    if "noise" in args:
+                        state["last_noise"] = args["noise"].detach().clone()
                     state["workflow_count"] += 1
                     state["current_sigmas"] = None
                     if cfg_type == "initialize":
                         state["initialized"] = True
                     self.set_state(state)
-                    print("- First workflow complete, stored last_uncond")
+                    print("- First workflow complete, stored last_uncond and noise")
                 return denoised
             
-            # Handle different CFG types
-            if cfg_type == "full":
-                result = denoised
-            elif cfg_type == "initialize" and not state["initialized"]:
-                result = denoised
-                if state["is_last_step"]:
-                    state["initialized"] = True
-                    self.set_state(state)
-            else:  # self or initialized initialize
-                current_idx = len(state["seen_sigmas"]) - 1
-                print(f"- Current step index: {current_idx}")
-                
-                # Use paper's exact formulation for noise prediction
+            current_idx = len(state["seen_sigmas"]) - 1
+            print(f"- Current step index: {current_idx}")
+            
+            # Apply temporal consistency at first step and blend throughout
+            if current_idx == 0:
+                # Strong influence at first step
                 noise_pred_uncond = state["last_uncond"] * state["delta"]
-                print(f"- Scaled noise prediction range: [{noise_pred_uncond.min():.3f}, {noise_pred_uncond.max():.3f}]")
-                
-                # Apply CFG with scaled prediction
-                result = noise_pred_uncond + cond_scale * (cond_denoised - noise_pred_uncond) * state["residual_scale"]
-                print(f"- Result range after CFG: [{result.min():.3f}, {result.max():.3f}]")
-                
-                # Store last prediction if this is the last step
-                if state["is_last_step"]:
-                    # Calculate F_theta using paper's formulation
-                    F_theta = (uncond_denoised - state["beta_prod_t"][current_idx] * noise_pred_uncond) / state["alpha_prod_t"][current_idx]
-                    print(f"- F_theta range: [{F_theta.min():.3f}, {F_theta.max():.3f}]")
-                    
-                    delta_x = state["c_out"][current_idx] * F_theta + state["c_skip"][current_idx] * uncond_denoised
-                    print(f"- delta_x range: [{delta_x.min():.3f}, {delta_x.max():.3f}]")
-                    
-                    # Scale delta_x with next step's coefficients
-                    if current_idx < len(state["current_sigmas"]) - 1:
-                        next_alpha = state["alpha_prod_t"][current_idx + 1]
-                        next_beta = state["beta_prod_t"][current_idx + 1]
-                    else:
-                        next_alpha = torch.ones_like(state["alpha_prod_t"][0])
-                        next_beta = torch.zeros_like(state["beta_prod_t"][0])
-                    print(f"- Next step coefficients - alpha: {next_alpha:.6f}, beta: {next_beta:.6f}")
-                    
-                    # Update stored prediction with properly scaled residual
-                    if next_beta > 0:
-                        final_update = (next_alpha * delta_x) / next_beta
-                        # Add noise only when beta > 0
-                        noise = torch.randn_like(delta_x) * (1 - next_alpha**2).sqrt()
-                        final_update = final_update + noise
-                        print(f"- Added noise range: [{noise.min():.3f}, {noise.max():.3f}]")
-                    else:
-                        # For the last step, just use the current prediction
-                        final_update = uncond_denoised
-                    
-                    print(f"- Final update range: [{final_update.min():.3f}, {final_update.max():.3f}]")
-                    state["last_uncond"] = final_update
-                    state["workflow_count"] += 1
-                    state["current_sigmas"] = None
-                    self.set_state(state)
+                result = noise_pred_uncond + cond_scale * (cond_denoised - noise_pred_uncond)
+                # Apply residual scale to entire result for stronger consistency
+                result = result * state["residual_scale"] + denoised * (1 - state["residual_scale"])
+            else:
+                # Lighter influence in later steps
+                blend_scale = state["residual_scale"] * (1 - current_idx / len(state["current_sigmas"]))
+                result = denoised * (1 - blend_scale) + uncond_denoised * blend_scale
+            
+            print(f"- Result range after blending: [{result.min():.3f}, {result.max():.3f}]")
+            
+            # Store last prediction if this is the last step
+            if state["is_last_step"]:
+                state["last_uncond"] = uncond_denoised.detach().clone()
+                # Store noise for next frame initialization
+                if "noise" in args:
+                    state["last_noise"] = args["noise"].detach().clone()
+                state["workflow_count"] += 1
+                state["current_sigmas"] = None
+                self.set_state(state)
+                print(f"- Stored new last_uncond range: [{state['last_uncond'].min():.3f}, {state['last_uncond'].max():.3f}]")
             
             return result
 
@@ -371,11 +348,6 @@ class StreamCrossAttention(ControlNodeBase):
     - Pre-computes and caches prompt embeddings
     - Stores Key-Value pairs for reuse with static prompts
     - Only recomputes KV pairs when prompt changes
-    
-    Additional optimizations beyond paper:
-    - QK normalization for better numerical stability
-    - Rotary position embeddings (RoPE) for improved temporal consistency
-    - Configurable context window size for memory/quality tradeoff
     """
     
     RETURN_TYPES = ("MODEL",)
@@ -387,21 +359,6 @@ class StreamCrossAttention(ControlNodeBase):
         inputs = super().INPUT_TYPES()
         inputs["required"].update({
             "model": ("MODEL",),
-            "qk_norm": ("BOOLEAN", {
-                "default": True,
-                "tooltip": "Additional optimization: Whether to apply layer normalization to query and key tensors"
-            }),
-            "use_rope": ("BOOLEAN", {
-                "default": True,
-                "tooltip": "Additional optimization: Whether to use rotary position embeddings for better temporal consistency"
-            }),
-            "context_size": ("INT", {
-                "default": 4,
-                "min": 1,
-                "max": 32,
-                "step": 1,
-                "tooltip": "Additional optimization: Maximum number of past frames to keep in context. Higher values use more memory but may improve temporal consistency."
-            }),
             "use_kv_cache": ("BOOLEAN", {
                 "default": True,
                 "tooltip": "Paper Section 3.5: Whether to cache key-value pairs for static prompts to avoid recomputation"
@@ -414,19 +371,14 @@ class StreamCrossAttention(ControlNodeBase):
         self.last_model_hash = None
         self.cross_attention_hook = None
 
-    def update(self, model, always_execute=True, qk_norm=True, use_rope=True, context_size=4, use_kv_cache=True):
-        print(f"[StreamCrossAttention] Initializing with qk_norm={qk_norm}, use_rope={use_rope}, context_size={context_size}, use_kv_cache={use_kv_cache}")
+    def update(self, model, always_execute=True, use_kv_cache=True):
+        print(f"[StreamCrossAttention] Initializing with use_kv_cache={use_kv_cache}")
         
-        # Get state with defaults
         state = self.get_state({
-            "qk_norm": qk_norm,  # Additional optimization
-            "use_rope": use_rope,  # Additional optimization
-            "context_size": context_size,  # Additional optimization
-            "use_kv_cache": use_kv_cache,  # From paper Section 3.5
+            "use_kv_cache": use_kv_cache,
             "workflow_count": 0,
-            "context_queue": [],  # Additional: Store past context tensors for temporal consistency
             "kv_cache": {},  # From paper Section 3.5: Cache KV pairs for each prompt
-            "last_prompt_embeds": None,  # From paper Section 3.5: For cache validation
+            "prompt_cache": {},  # Store prompt embeddings per module and dimension
         })
         
         def cross_attention_forward(module, x, context=None, mask=None, value=None):
@@ -435,82 +387,29 @@ class StreamCrossAttention(ControlNodeBase):
             
             # Paper Section 3.5: KV Caching Logic
             cache_hit = False
-            if state["use_kv_cache"] and state["last_prompt_embeds"] is not None:
-                # Compare current context with cached prompt embeddings
-                if torch.allclose(context, state["last_prompt_embeds"], rtol=1e-5, atol=1e-5):
-                    cache_hit = True
-                    k, v = state["kv_cache"].get(module, (None, None))
-                    if k is not None and v is not None:
-                        print("[StreamCrossAttention] Using cached KV pairs")
+            if state["use_kv_cache"] and context is not None:
+                # Create a unique key for this module and context shape
+                cache_key = (id(module), context.shape)
+                
+                if cache_key in state["prompt_cache"]:
+                    cached_context = state["prompt_cache"][cache_key]
+                    # Compare embeddings of same dimension
+                    if torch.allclose(context, cached_context, rtol=1e-5, atol=1e-5):
+                        cache_hit = True
+                        k, v = state["kv_cache"].get(cache_key, (None, None))
+                        if k is not None and v is not None:
+                            print("[StreamCrossAttention] Using cached KV pairs")
             
             if not cache_hit:
-                # Additional optimization: Temporal context management
-                if len(state["context_queue"]) >= state["context_size"]:
-                    state["context_queue"].pop(0)
-                state["context_queue"].append(context.detach().clone())
-                
-                # Additional optimization: Use past context for temporal consistency
-                full_context = torch.cat(state["context_queue"], dim=1)
-                
-                # Generate k/v for full context
-                k = module.to_k(full_context)
-                v = value if value is not None else module.to_v(full_context)
+                # Generate k/v for context
+                k = module.to_k(context)
+                v = value if value is not None else module.to_v(context)
                 
                 # Paper Section 3.5: Cache KV pairs for static prompts
-                if state["use_kv_cache"]:
-                    state["last_prompt_embeds"] = context.detach().clone()
-                    state["kv_cache"][module] = (k.detach().clone(), v.detach().clone())
-            
-            # Additional optimization: QK normalization
-            if state["qk_norm"]:
-                q_norm = torch.nn.LayerNorm(q.shape[-1], device=q.device, dtype=q.dtype)
-                k_norm = torch.nn.LayerNorm(k.shape[-1], device=k.device, dtype=k.dtype)
-                q = q_norm(q)
-                k = k_norm(k)
-            
-            # Additional optimization: Rotary position embeddings
-            if state["use_rope"]:
-                # Calculate position embeddings
-                batch_size = q.shape[0]
-                seq_len = q.shape[1]
-                full_seq_len = k.shape[1]  # Use full context length for k/v
-                dim = q.shape[2]
-                
-                # Create position indices for q and k separately
-                q_position = torch.arange(seq_len, device=q.device).unsqueeze(0).unsqueeze(-1)
-                k_position = torch.arange(full_seq_len, device=k.device).unsqueeze(0).unsqueeze(-1)
-                
-                q_position = q_position.repeat(batch_size, 1, dim//2)
-                k_position = k_position.repeat(batch_size, 1, dim//2)
-                
-                # Calculate frequencies
-                freq = 10000.0 ** (-torch.arange(0, dim//2, 2, device=q.device) / dim)
-                freq = freq.repeat((dim + 1) // 2)[:dim//2]
-                
-                # Calculate rotation angles
-                q_theta = q_position * freq
-                k_theta = k_position * freq
-                
-                # Apply rotations to q
-                q_cos = torch.cos(q_theta)
-                q_sin = torch.sin(q_theta)
-                q_reshaped = q.view(*q.shape[:-1], -1, 2)
-                q_out = torch.cat([
-                    q_reshaped[..., 0] * q_cos - q_reshaped[..., 1] * q_sin,
-                    q_reshaped[..., 0] * q_sin + q_reshaped[..., 1] * q_cos
-                ], dim=-1)
-                
-                # Apply rotations to k
-                k_cos = torch.cos(k_theta)
-                k_sin = torch.sin(k_theta)
-                k_reshaped = k.view(*k.shape[:-1], -1, 2)
-                k_out = torch.cat([
-                    k_reshaped[..., 0] * k_cos - k_reshaped[..., 1] * k_sin,
-                    k_reshaped[..., 0] * k_sin + k_reshaped[..., 1] * k_cos
-                ], dim=-1)
-                
-                q = q_out
-                k = k_out
+                if state["use_kv_cache"] and context is not None:
+                    cache_key = (id(module), context.shape)
+                    state["prompt_cache"][cache_key] = context.detach().clone()
+                    state["kv_cache"][cache_key] = (k.detach().clone(), v.detach().clone())
             
             # Standard attention computation with memory-efficient access pattern
             batch_size = q.shape[0]
