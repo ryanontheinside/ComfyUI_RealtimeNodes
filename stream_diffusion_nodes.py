@@ -3,9 +3,13 @@ from .base.control_base import ControlNodeBase
 import comfy.model_management
 import comfy.samplers
 import random
-from comfy.ldm.modules.attention import optimized_attention_for_device
 
 class StreamCFG(ControlNodeBase):
+    """Implements CFG approaches for temporal consistency between workflow runs"""
+    
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "update"
+    CATEGORY = "real-time/sampling"
     
     @classmethod
     def INPUT_TYPES(cls):
@@ -30,13 +34,29 @@ class StreamCFG(ControlNodeBase):
                 "step": 0.1,
                 "tooltip": "Delta parameter for self/initialize CFG types"
             }),
+            "residual_decay": ("FLOAT", {
+                "default": 0.6,
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.01,
+                "tooltip": "Decay factor for residual scale over time (1.0 = no decay)"
+            }),
+            "noise_decay": ("FLOAT", {
+                "default": 0.35,
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.01,
+                "tooltip": "Decay factor for noise injection over time (1.0 = no decay)"
+            }),
+            "reset_interval": ("INT", {
+                "default": 0,
+                "min": 0,
+                "max": 100,
+                "step": 1,
+                "tooltip": "Reset stock noise every N frames (0 = never reset)"
+            }),
         })
         return inputs
-    
-    RETURN_TYPES = ("MODEL",)
-    FUNCTION = "update"
-    CATEGORY = "real-time/sampling"
-    DESCRIPTION = "Implements CFG approaches as seen in StreamDiffusion for temporal consistency between workflow runs."
     
     def __init__(self):
         super().__init__()
@@ -44,8 +64,8 @@ class StreamCFG(ControlNodeBase):
         self.last_model_hash = None
         self.post_cfg_function = None
 
-    def update(self, model, always_execute=True, cfg_type="self", residual_scale=0.4, delta=1.0):
-        print(f"[StreamCFG] Initializing with cfg_type={cfg_type}, residual_scale={residual_scale}, delta={delta}")
+    def update(self, model, always_execute=True, cfg_type="self", residual_scale=0.4, delta=1.0, residual_decay=0.95, noise_decay=0.8, reset_interval=0):
+        print(f"[StreamCFG] Initializing with cfg_type={cfg_type}, residual_scale={residual_scale}, delta={delta}, residual_decay={residual_decay}, noise_decay={noise_decay}, reset_interval={reset_interval}")
         
         # Get state with defaults
         state = self.get_state({
@@ -63,6 +83,9 @@ class StreamCFG(ControlNodeBase):
             "beta_prod_t": None,
             "c_skip": None,
             "c_out": None,
+            "residual_decay": residual_decay,
+            "noise_decay": noise_decay,
+            "reset_interval": reset_interval,
         })
         
         def post_cfg_function(args):
@@ -160,12 +183,27 @@ class StreamCFG(ControlNodeBase):
                 current_idx = len(state["seen_sigmas"]) - 1
                 print(f"- Current step index: {current_idx}")
                 
-                # Use paper's exact formulation for noise prediction
-                noise_pred_uncond = state["last_uncond"] * state["delta"]
-                print(f"- Scaled noise prediction range: [{noise_pred_uncond.min():.3f}, {noise_pred_uncond.max():.3f}]")
+                # Apply decaying residual scale
+                current_residual_scale = state["residual_scale"] * (state["residual_decay"] ** state["workflow_count"])
+                print(f"- Current residual scale: {current_residual_scale:.6f}")
                 
-                # Apply CFG with scaled prediction
-                result = noise_pred_uncond + cond_scale * (cond_denoised - noise_pred_uncond) * state["residual_scale"]
+                # Calculate temporal mixing weights
+                current_weight = 1.0  # Base weight for current prediction
+                temporal_weight = current_residual_scale * state["delta"]  # Weight for temporal consistency
+                
+                # Normalize weights to ensure proper blending
+                total_weight = current_weight + temporal_weight
+                current_weight = current_weight / total_weight
+                temporal_weight = temporal_weight / total_weight
+                
+                print(f"- Mixing weights - current: {current_weight:.3f}, temporal: {temporal_weight:.3f}")
+                
+                # Blend predictions with normalized weights
+                noise_pred_uncond = current_weight * uncond_denoised + temporal_weight * state["last_uncond"]
+                print(f"- Blended noise prediction range: [{noise_pred_uncond.min():.3f}, {noise_pred_uncond.max():.3f}]")
+                
+                # Apply CFG normally
+                result = noise_pred_uncond + cond_scale * (cond_denoised - noise_pred_uncond)
                 print(f"- Result range after CFG: [{result.min():.3f}, {result.max():.3f}]")
                 
                 # Store last prediction if this is the last step
@@ -189,16 +227,22 @@ class StreamCFG(ControlNodeBase):
                     # Update stored prediction with properly scaled residual
                     if next_beta > 0:
                         final_update = (next_alpha * delta_x) / next_beta
-                        # Add noise only when beta > 0
-                        noise = torch.randn_like(delta_x) * (1 - next_alpha**2).sqrt()
+                        # Add decaying noise when beta > 0
+                        noise_scale = state["noise_decay"] ** state["workflow_count"]
+                        noise = torch.randn_like(delta_x) * (1 - next_alpha**2).sqrt() * noise_scale
                         final_update = final_update + noise
-                        print(f"- Added noise range: [{noise.min():.3f}, {noise.max():.3f}]")
+                        print(f"- Added noise (scale={noise_scale:.6f}) range: [{noise.min():.3f}, {noise.max():.3f}]")
                     else:
-                        # For the last step, just use the current prediction
                         final_update = uncond_denoised
                     
                     print(f"- Final update range: [{final_update.min():.3f}, {final_update.max():.3f}]")
-                    state["last_uncond"] = final_update
+                    
+                    # Reset stock noise if interval is reached
+                    if state["reset_interval"] > 0 and state["workflow_count"] % state["reset_interval"] == 0:
+                        print(f"- Resetting stock noise at workflow {state['workflow_count']}")
+                        state["last_uncond"] = uncond_denoised.detach().clone()
+                    else:
+                        state["last_uncond"] = final_update
                     state["workflow_count"] += 1
                     state["current_sigmas"] = None
                     self.set_state(state)
@@ -229,6 +273,7 @@ class StreamCFG(ControlNodeBase):
 
 #NOTE: totally and utterly experimental. No theoretical backing whatsoever.
 class StreamConditioning(ControlNodeBase):
+    """Applies Residual CFG to conditioning for improved temporal consistency with different CFG types"""
     #NOTE: experimental
     @classmethod
     def INPUT_TYPES(s):
@@ -271,7 +316,6 @@ class StreamConditioning(ControlNodeBase):
     RETURN_NAMES = ("positive", "negative")
     FUNCTION = "update"
     CATEGORY = "real-time/control/utility"
-    DESCRIPTION = "Applies Residual CFG to conditioning for improved temporal consistency with different CFG types. This is totally and utterly experimental. No theoretical backing whatsoever."
 
     def __init__(self):
         super().__init__()
@@ -365,19 +409,18 @@ class StreamConditioning(ControlNodeBase):
         return (positive_out, negative_out)
 
 
-
 class StreamCrossAttention(ControlNodeBase):
     """Implements optimized cross attention with KV-cache for real-time generation
     
-    Core functionality from StreamDiffusion:
+    Paper reference: StreamDiffusion Section 3.5 "Pre-computation"
     - Pre-computes and caches prompt embeddings
     - Stores Key-Value pairs for reuse with static prompts
     - Only recomputes KV pairs when prompt changes
     
-    Additional optimizations beyond StreamDiffusion:
-    - QK normalization for better numerical stability (disabled by default)
-    - Rotary position embeddings (RoPE) for improved temporal consistency (disabled by default)
-    - ComfyUI's optimized attention implementation for device-specific optimizations (enabled by default)
+    Additional optimizations beyond paper:
+    - QK normalization for better numerical stability
+    - Rotary position embeddings (RoPE) for improved temporal consistency
+    - Configurable context window size for memory/quality tradeoff
     """
     
     RETURN_TYPES = ("MODEL",)
@@ -389,23 +432,24 @@ class StreamCrossAttention(ControlNodeBase):
         inputs = super().INPUT_TYPES()
         inputs["required"].update({
             "model": ("MODEL",),
-            # Core StreamDiffusion functionality
-            "use_kv_cache": ("BOOLEAN", {
-                "default": True,
-                "tooltip": "StreamDiffusion: Whether to cache key-value pairs for static prompts to avoid recomputation"
-            }),
-            # Additional optimizations
-            "use_optimized_attention": ("BOOLEAN", {
-                "default": True,
-                "tooltip": "Whether to use ComfyUI's optimized attention implementation for device-specific optimizations"
-            }),
             "qk_norm": ("BOOLEAN", {
-                "default": False,
+                "default": True,
                 "tooltip": "Additional optimization: Whether to apply layer normalization to query and key tensors"
             }),
             "use_rope": ("BOOLEAN", {
-                "default": False,
+                "default": True,
                 "tooltip": "Additional optimization: Whether to use rotary position embeddings for better temporal consistency"
+            }),
+            "context_size": ("INT", {
+                "default": 4,
+                "min": 1,
+                "max": 32,
+                "step": 1,
+                "tooltip": "Additional optimization: Maximum number of past frames to keep in context. Higher values use more memory but may improve temporal consistency."
+            }),
+            "use_kv_cache": ("BOOLEAN", {
+                "default": True,
+                "tooltip": "Paper Section 3.5: Whether to cache key-value pairs for static prompts to avoid recomputation"
             }),
         })
         return inputs
@@ -415,19 +459,19 @@ class StreamCrossAttention(ControlNodeBase):
         self.last_model_hash = None
         self.cross_attention_hook = None
 
-    def update(self, model, always_execute=True, use_optimized_attention=True, qk_norm=False, use_rope=False, use_kv_cache=True):
-        print(f"[StreamCrossAttention] Initializing with use_optimized_attention={use_optimized_attention}, qk_norm={qk_norm}, use_rope={use_rope}, use_kv_cache={use_kv_cache}")
+    def update(self, model, always_execute=True, qk_norm=True, use_rope=True, context_size=4, use_kv_cache=True):
+        print(f"[StreamCrossAttention] Initializing with qk_norm={qk_norm}, use_rope={use_rope}, context_size={context_size}, use_kv_cache={use_kv_cache}")
         
         # Get state with defaults
         state = self.get_state({
             "qk_norm": qk_norm,  # Additional optimization
             "use_rope": use_rope,  # Additional optimization
+            "context_size": context_size,  # Additional optimization
             "use_kv_cache": use_kv_cache,  # From paper Section 3.5
-            "use_optimized_attention": use_optimized_attention,  # ComfyUI optimization
             "workflow_count": 0,
+            "context_queue": [],  # Additional: Store past context tensors for temporal consistency
             "kv_cache": {},  # From paper Section 3.5: Cache KV pairs for each prompt
             "last_prompt_embeds": None,  # From paper Section 3.5: For cache validation
-            "last_context_shape": None,  # Store context shape for validation
         })
         
         def cross_attention_forward(module, x, context=None, mask=None, value=None):
@@ -437,29 +481,29 @@ class StreamCrossAttention(ControlNodeBase):
             # Paper Section 3.5: KV Caching Logic
             cache_hit = False
             if state["use_kv_cache"] and state["last_prompt_embeds"] is not None:
-                # Validate context shape first
-                current_shape = context.shape
-                if current_shape == state["last_context_shape"]:
-                    # Only compare content if shapes match
-                    try:
-                        if torch.allclose(context, state["last_prompt_embeds"], rtol=1e-5, atol=1e-5):
-                            cache_hit = True
-                            k, v = state["kv_cache"].get(module, (None, None))
-                            if k is not None and v is not None:
-                                print("[StreamCrossAttention] Using cached KV pairs")
-                    except:
-                        # If comparison fails, just regenerate KV pairs
-                        cache_hit = False
+                # Compare current context with cached prompt embeddings
+                if torch.allclose(context, state["last_prompt_embeds"], rtol=1e-5, atol=1e-5):
+                    cache_hit = True
+                    k, v = state["kv_cache"].get(module, (None, None))
+                    if k is not None and v is not None:
+                        print("[StreamCrossAttention] Using cached KV pairs")
             
             if not cache_hit:
-                # Generate k/v for current context
-                k = module.to_k(context)
-                v = value if value is not None else module.to_v(context)
+                # Additional optimization: Temporal context management
+                if len(state["context_queue"]) >= state["context_size"]:
+                    state["context_queue"].pop(0)
+                state["context_queue"].append(context.detach().clone())
+                
+                # Additional optimization: Use past context for temporal consistency
+                full_context = torch.cat(state["context_queue"], dim=1)
+                
+                # Generate k/v for full context
+                k = module.to_k(full_context)
+                v = value if value is not None else module.to_v(full_context)
                 
                 # Paper Section 3.5: Cache KV pairs for static prompts
                 if state["use_kv_cache"]:
                     state["last_prompt_embeds"] = context.detach().clone()
-                    state["last_context_shape"] = context.shape
                     state["kv_cache"][module] = (k.detach().clone(), v.detach().clone())
             
             # Additional optimization: QK normalization
@@ -474,69 +518,75 @@ class StreamCrossAttention(ControlNodeBase):
                 # Calculate position embeddings
                 batch_size = q.shape[0]
                 seq_len = q.shape[1]
+                full_seq_len = k.shape[1]  # Use full context length for k/v
                 dim = q.shape[2]
                 
-                # Create position indices
-                position = torch.arange(seq_len, device=q.device).unsqueeze(0).unsqueeze(-1)
-                position = position.repeat(batch_size, 1, dim//2)
+                # Create position indices for q and k separately
+                q_position = torch.arange(seq_len, device=q.device).unsqueeze(0).unsqueeze(-1)
+                k_position = torch.arange(full_seq_len, device=k.device).unsqueeze(0).unsqueeze(-1)
+                
+                q_position = q_position.repeat(batch_size, 1, dim//2)
+                k_position = k_position.repeat(batch_size, 1, dim//2)
                 
                 # Calculate frequencies
                 freq = 10000.0 ** (-torch.arange(0, dim//2, 2, device=q.device) / dim)
                 freq = freq.repeat((dim + 1) // 2)[:dim//2]
                 
                 # Calculate rotation angles
-                theta = position * freq
+                q_theta = q_position * freq
+                k_theta = k_position * freq
                 
-                # Apply rotations to q and k
-                cos = torch.cos(theta)
-                sin = torch.sin(theta)
+                # Apply rotations to q
+                q_cos = torch.cos(q_theta)
+                q_sin = torch.sin(q_theta)
+                q_reshaped = q.view(*q.shape[:-1], -1, 2)
+                q_out = torch.cat([
+                    q_reshaped[..., 0] * q_cos - q_reshaped[..., 1] * q_sin,
+                    q_reshaped[..., 0] * q_sin + q_reshaped[..., 1] * q_cos
+                ], dim=-1)
                 
-                def rotate_half(x):
-                    x = x.view(*x.shape[:-1], -1, 2)
-                    return torch.cat([
-                        x[..., 0] * cos - x[..., 1] * sin,
-                        x[..., 0] * sin + x[..., 1] * cos
-                    ], dim=-1)
+                # Apply rotations to k
+                k_cos = torch.cos(k_theta)
+                k_sin = torch.sin(k_theta)
+                k_reshaped = k.view(*k.shape[:-1], -1, 2)
+                k_out = torch.cat([
+                    k_reshaped[..., 0] * k_cos - k_reshaped[..., 1] * k_sin,
+                    k_reshaped[..., 0] * k_sin + k_reshaped[..., 1] * k_cos
+                ], dim=-1)
                 
-                q = rotate_half(q)
-                k = rotate_half(k)
+                q = q_out
+                k = k_out
             
-            # Use optimized attention if enabled
-            if state["use_optimized_attention"]:
-                # Let ComfyUI choose the best attention implementation
-                attn_func = optimized_attention_for_device(q.device)
-                out = attn_func(q, k, v, module.heads, mask=mask)
-            else:
-                # Standard attention computation with memory-efficient access pattern
-                batch_size = q.shape[0]
-                q_seq_len = q.shape[1]
-                k_seq_len = k.shape[1]
-                head_dim = q.shape[-1] // module.heads
-                
-                # Reshape for multi-head attention
-                q = q.view(batch_size, q_seq_len, module.heads, head_dim)
-                k = k.view(batch_size, k_seq_len, module.heads, head_dim)
-                v = v.view(batch_size, k_seq_len, module.heads, head_dim)
-                
-                # Transpose for attention computation
-                q = q.transpose(1, 2)
-                k = k.transpose(1, 2)
-                v = v.transpose(1, 2)
-                
-                # Compute attention scores
-                scale = head_dim ** -0.5
-                scores = torch.matmul(q, k.transpose(-2, -1)) * scale
-                
-                if mask is not None:
-                    scores = scores + mask
-                
-                # Apply attention
-                attn = torch.softmax(scores, dim=-1)
-                out = torch.matmul(attn, v)
-                
-                # Reshape back
-                out = out.transpose(1, 2).contiguous()
-                out = out.view(batch_size, q_seq_len, -1)
+            # Standard attention computation with memory-efficient access pattern
+            batch_size = q.shape[0]
+            q_seq_len = q.shape[1]
+            k_seq_len = k.shape[1]
+            head_dim = q.shape[-1] // module.heads
+            
+            # Reshape for multi-head attention
+            q = q.view(batch_size, q_seq_len, module.heads, head_dim)
+            k = k.view(batch_size, k_seq_len, module.heads, head_dim)
+            v = v.view(batch_size, k_seq_len, module.heads, head_dim)
+            
+            # Transpose for attention computation
+            q = q.transpose(1, 2)
+            k = k.transpose(1, 2)
+            v = v.transpose(1, 2)
+            
+            # Compute attention scores
+            scale = head_dim ** -0.5
+            scores = torch.matmul(q, k.transpose(-2, -1)) * scale
+            
+            if mask is not None:
+                scores = scores + mask
+            
+            # Apply attention
+            attn = torch.softmax(scores, dim=-1)
+            out = torch.matmul(attn, v)
+            
+            # Reshape back
+            out = out.transpose(1, 2).contiguous()
+            out = out.view(batch_size, q_seq_len, -1)
             
             # Project back to original dimension
             out = module.to_out[0](out)
