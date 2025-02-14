@@ -3,6 +3,7 @@ from .base.control_base import ControlNodeBase
 import comfy.model_management
 import comfy.samplers
 import random
+import math
 
 
 class StreamBatchSampler(ControlNodeBase):
@@ -23,6 +24,29 @@ class StreamBatchSampler(ControlNodeBase):
                 "step": 1,
                 "tooltip": "Number of denoising steps. Should match the frame buffer size."
             }),
+            "cfg_type": (["none", "full", "self", "initialize"], {
+                "default": "self",
+                "tooltip": "Type of CFG to use: none (no guidance), full (standard), self (memory efficient), or initialize (memory efficient with initialization)"
+            }),
+            "guidance_scale": ("FLOAT", {
+                "default": 1.2,
+                "min": 1.0,
+                "max": 20.0,
+                "step": 0.1,
+                "tooltip": "CFG guidance scale - 1.0 means no guidance"
+            }),
+            "delta": ("FLOAT", {
+                "default": 1.0,
+                "min": 0.0,
+                "max": 5.0,
+                "step": 0.1,
+                "tooltip": "Delta parameter for self/initialize CFG types"
+            }),
+            "prompt": ("STRING", {
+                "multiline": True,
+                "default": "",
+                "tooltip": "Text prompt to use for caching. Only recomputes KV cache when this changes."
+            }),
         })
         return inputs
     
@@ -32,11 +56,101 @@ class StreamBatchSampler(ControlNodeBase):
         self.frame_buffer = []
         self.x_t_latent_buffer = None
         self.stock_noise = None
+        # Add CFG state
+        self.cfg_type = "self"
+        self.guidance_scale = 1.2
+        self.delta = 1.0
+        # Add cross attention state
+        self.last_prompt = None
+        self.kv_cache = None
+        self.cross_attention_hook = None
+        self.last_model_hash = None
+    
+    def setup_cross_attention(self, model, prompt):
+        """Set up cross attention optimization for the model"""
+        print(f"[StreamBatchSampler] Setting up cross attention with prompt: {prompt}")
+        
+        def cross_attention_forward(module, x, context=None, mask=None):
+            """Optimized cross attention with KV caching"""
+            batch_size = x.shape[0]
+            
+            # Generate query from input
+            q = module.to_q(x)
+            
+            # Check if we need to recompute KV cache
+            if self.kv_cache is None or self.last_prompt != prompt:
+                print("[StreamBatchSampler] Computing new KV cache")
+                k = module.to_k(context)
+                v = module.to_v(context)
+                self.kv_cache = (k, v)
+                self.last_prompt = prompt
+            else:
+                print("[StreamBatchSampler] Using cached KV pairs")
+                k, v = self.kv_cache
+            
+            # Handle batch size expansion if needed
+            if k.shape[0] == 1 and batch_size > 1:
+                k = k.expand(batch_size, -1, -1)
+                v = v.expand(batch_size, -1, -1)
+            
+            # Reshape for attention
+            head_dim = q.shape[-1] // module.heads
+            q = q.view(batch_size, -1, module.heads, head_dim).transpose(1, 2)
+            k = k.view(-1, k.shape[1], module.heads, head_dim).transpose(1, 2)
+            v = v.view(-1, v.shape[1], module.heads, head_dim).transpose(1, 2)
+            
+            # Compute attention
+            scale = 1.0 / math.sqrt(head_dim)
+            scores = torch.matmul(q, k.transpose(-2, -1)) * scale
+            
+            if mask is not None:
+                scores = scores + mask
+            
+            attn = torch.softmax(scores, dim=-1)
+            out = torch.matmul(attn, v)
+            
+            # Reshape output
+            out = out.transpose(1, 2).reshape(batch_size, -1, module.heads * head_dim)
+            return module.to_out[0](out)
+        
+        def hook_cross_attention(module, input, output):
+            """Hook to replace cross attention modules with optimized version"""
+            if isinstance(module, torch.nn.Module) and hasattr(module, "to_q"):
+                if not hasattr(module, "_original_forward"):
+                    module._original_forward = module.forward
+                module.forward = lambda *args, **kwargs: cross_attention_forward(module, *args, **kwargs)
+            return output
+        
+        # Only set up hooks if model has changed or prompt has changed
+        model_hash = hash(str(model))
+        if model_hash != self.last_model_hash or self.last_prompt != prompt:
+            print("[StreamBatchSampler] Setting up new cross attention hooks")
+            # Remove old hooks if they exist
+            if self.cross_attention_hook is not None:
+                self.cross_attention_hook.remove()
+            
+            # Clone model and apply hooks
+            m = model.clone()
+            
+            def register_hooks(module):
+                if isinstance(module, torch.nn.Module) and hasattr(module, "to_q"):
+                    self.cross_attention_hook = module.register_forward_hook(hook_cross_attention)
+            
+            m.model.apply(register_hooks)
+            self.last_model_hash = model_hash
+            return m
+        
+        return model
     
     def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
-        """Sample with staggered batch denoising steps"""
+        """Sample with staggered batch denoising steps and CFG"""
         extra_args = {} if extra_args is None else extra_args
         print(f"[StreamBatchSampler] Starting sampling with {len(sigmas)-1} steps")
+        print(f"[StreamBatchSampler] CFG type: {self.cfg_type}, scale: {self.guidance_scale}, delta: {self.delta}")
+        
+        # Set up cross attention optimization
+        prompt = extra_args.get("prompt", "")
+        model = self.setup_cross_attention(model, prompt)
         
         # Get number of frames in batch and available sigmas
         batch_size = noise.shape[0]
@@ -81,13 +195,58 @@ class StreamBatchSampler(ControlNodeBase):
             
         # Run model on entire batch at once
         with torch.no_grad():
-            # Process all frames in parallel
-            sigma_batch = sigmas[:-1]
-            print(f"[StreamBatchSampler] Using sigmas for denoising: {sigma_batch}")
+            # Handle CFG based on mode
+            if self.cfg_type == "none" or self.guidance_scale <= 1.0:
+                # No guidance - process batch normally
+                model_output = model(x, sigmas[:-1], **extra_args)
+                model_pred = model_output[0]
+            else:
+                # Apply CFG based on type
+                if self.cfg_type == "full":
+                    # Double the batch for cond/uncond
+                    x_double = torch.cat([x, x], dim=0)
+                    sigmas_double = torch.cat([sigmas[:-1], sigmas[:-1]], dim=0)
+                    model_output = model(x_double, sigmas_double, **extra_args)
+                    noise_pred_uncond, noise_pred_text = model_output[0].chunk(2)
+                elif self.cfg_type == "initialize":
+                    # Add single uncond at start
+                    x_plus_uc = torch.cat([x[0:1], x], dim=0)
+                    sigmas_plus_uc = torch.cat([sigmas[:-1][0:1], sigmas[:-1]], dim=0)
+                    model_output = model(x_plus_uc, sigmas_plus_uc, **extra_args)
+                    noise_pred_uncond = model_output[0][0:1]
+                    noise_pred_text = model_output[0][1:]
+                    # Update stock noise
+                    self.stock_noise = torch.cat([noise_pred_uncond, self.stock_noise[1:]], dim=0)
+                else:  # self
+                    # Use stock noise for uncond
+                    model_output = model(x, sigmas[:-1], **extra_args)
+                    noise_pred_text = model_output[0]
+                    noise_pred_uncond = self.stock_noise * self.delta
+                
+                # Combine predictions
+                model_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
             
-            denoised_batch = model(x, sigma_batch, **extra_args)
+            print(f"[StreamBatchSampler] Model prediction shape: {model_pred.shape}")
+            
+            # Update stock noise for self/initialize modes
+            if (self.cfg_type == "self" or self.cfg_type == "initialize") and num_sigmas > 1:
+                # Calculate next alpha/beta
+                alpha_next = torch.cat([alpha_prod_t[1:], torch.ones_like(alpha_prod_t[0:1])], dim=0)
+                beta_next = torch.cat([beta_prod_t[1:], torch.ones_like(beta_prod_t[0:1])], dim=0)
+                
+                # Update stock noise
+                scaled_noise = beta_prod_t * self.stock_noise
+                delta_x = (x - scaled_noise) / alpha_prod_t
+                delta_x = alpha_next * delta_x
+                delta_x = delta_x / beta_next
+                
+                # Rotate noise
+                init_noise = torch.cat([noise[1:], noise[0:1]], dim=0)
+                self.stock_noise = init_noise + delta_x
+            
+            # Compute denoised result
+            denoised_batch = (x - beta_prod_t * model_pred) / alpha_prod_t
             print(f"[StreamBatchSampler] Denoised batch shape: {denoised_batch.shape}")
-            print(f"[StreamBatchSampler] Denoised stats - min: {denoised_batch.min():.3f}, max: {denoised_batch.max():.3f}")
             
             # Update buffer with intermediate results
             if num_sigmas > 1:
@@ -107,9 +266,12 @@ class StreamBatchSampler(ControlNodeBase):
         
         return x_0_pred_out
     
-    def update(self, num_steps=4, always_execute=True):
+    def update(self, num_steps=4, cfg_type="self", guidance_scale=1.2, delta=1.0, prompt="", always_execute=True):
         """Create sampler with specified settings"""
         self.num_steps = num_steps
+        self.cfg_type = cfg_type
+        self.guidance_scale = guidance_scale
+        self.delta = delta
         sampler = comfy.samplers.KSAMPLER(self.sample)
         return (sampler,)
 
