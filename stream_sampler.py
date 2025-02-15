@@ -7,81 +7,80 @@ import math
 
 
 class StreamBatchSampler(ControlNodeBase):
-    """Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps"""
-    
-    RETURN_TYPES = ("SAMPLER",)
-    FUNCTION = "update"
-    CATEGORY = "real-time/sampling"
-    
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
         inputs["required"].update({
-            "num_steps": ("INT", {
-                "default": 4,
+            "latent": ("LATENT",),
+            "num_timesteps": ("INT", {
+                "default": 2,
                 "min": 1,
                 "max": 10,
                 "step": 1,
-                "tooltip": "Number of denoising steps. Should match the frame buffer size."
+                "tooltip": "Number of denoising steps to use. More steps = better quality but MUCH slower. StreamDiffusion's speed comes from using just 2 steps for img2img (32,45) or 4 for txt2img (0,16,32,45)"
             }),
-            "use_cfg": ("BOOLEAN", {
-                "default": False,
-                "tooltip": "Whether to use classifier-free guidance optimizations"
+            "frame_buffer_size": ("INT", {
+                "default": 1,
+                "min": 1,
+                "max": 10,
+                "step": 1,
+                "tooltip": "How many frames to process together for temporal consistency. Each frame is processed at each timestep (total batch = frame_buffer_size * num_timesteps). Higher values reduce flickering but use more VRAM and don't improve speed"
             }),
             "cfg_type": (["none", "full", "self", "initialize"], {
                 "default": "self",
-                "tooltip": "Type of CFG to use: none (no guidance), full (standard), self (memory efficient), or initialize (memory efficient with initialization)"
+                "tooltip": "'self' is fastest and most memory efficient, 'full' is standard SD behavior but slower, 'initialize' is a middle ground, 'none' disables guidance"
             }),
             "guidance_scale": ("FLOAT", {
                 "default": 1.2,
                 "min": 1.0,
                 "max": 20.0,
                 "step": 0.1,
-                "tooltip": "CFG guidance scale - 1.0 means no guidance"
+                "tooltip": "How closely to follow the prompt. StreamDiffusion works best with low values (1.2-1.5). Higher values = stronger prompt influence but more artifacts"
             }),
             "delta": ("FLOAT", {
                 "default": 1.0,
                 "min": 0.0,
                 "max": 5.0,
                 "step": 0.1,
-                "tooltip": "Delta parameter for self/initialize CFG types"
-            }),
-            "use_similarity_filter": ("BOOLEAN", {
-                "default": False,
-                "tooltip": "Whether to use similarity filtering to skip similar frames"
+                "tooltip": "Only used with 'self' CFG. Controls strength of self-guidance. Higher values = stronger guidance but more artifacts. Default 1.0 works well"
             }),
             "similarity_threshold": ("FLOAT", {
-                "default": 0.98,
+                "default": 0.0,
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.01,
-                "tooltip": "Threshold for similarity filtering - higher means more frames are skipped"
+                "tooltip": "Skip frames that are too similar to save compute. 0 = process all frames. Try 0.98 if you want to skip static scenes. Higher = more skipping"
+                #TODO: see if this is backwards from original
             }),
             "max_skip_frames": ("INT", {
                 "default": 10,
                 "min": 1,
                 "max": 100,
                 "step": 1,
-                "tooltip": "Maximum number of consecutive frames to skip"
+                "tooltip": "Maximum frames to skip when using similarity filter. Prevents getting stuck on static scenes. Lower = more responsive to changes"
             }),
         })
         inputs["optional"] = {
             "prompt": ("STRING", {
                 "multiline": True,
                 "default": "",
-                "tooltip": "Text prompt to use for cross-attention optimization. If provided, enables KV caching."
+                "tooltip": "Optional text prompt. Enables KV caching for faster processing. Leave empty to disable. Same prompt across frames = faster"
             }),
         }
         return inputs
     
+    RETURN_TYPES = ("SAMPLER", "LATENT",)
+    FUNCTION = "update"
+    CATEGORY = "real-time/sampling"
+    DESCRIPTION="Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps (StreamDiffusion)"
+    
     def __init__(self):
         super().__init__()
-        self.num_steps = None
-        self.frame_buffer = []
+        self.frame_buffer_size = None
+        self.frame_buffer = []  # List to store incoming frames
         self.x_t_latent_buffer = None
         self.stock_noise = None
         # Add CFG state
-        self.use_cfg = False
         self.cfg_type = "self"
         self.guidance_scale = 1.2
         self.delta = 1.0
@@ -92,12 +91,15 @@ class StreamBatchSampler(ControlNodeBase):
         self.cross_attention_hook = None
         self.last_model_hash = None
         # Add similarity filter state
-        self.use_similarity_filter = False
+        self.similarity_threshold = 0.0
+        self.max_skip_frames = 10
         self.similarity_filter = None
+        # Add buffer state
+        self.num_timesteps = None
     
     def process_with_cfg(self, model, x, sigma_batch, extra_args):
         """Apply classifier-free guidance based on current cfg_type"""
-        if not self.use_cfg or self.cfg_type == "none" or self.guidance_scale <= 1.0:
+        if self.cfg_type == "none" or self.guidance_scale <= 1.0:
             # No guidance - process batch normally
             return model(x, sigma_batch, **extra_args)
             
@@ -221,7 +223,7 @@ class StreamBatchSampler(ControlNodeBase):
         else:
             print("[StreamBatchSampler] Cross attention optimization disabled (no prompt)")
 
-        if self.use_cfg:
+        if self.guidance_scale > 1.0:
             print(f"[StreamBatchSampler] CFG enabled - type: {self.cfg_type}, scale: {self.guidance_scale}, delta: {self.delta}")
         
         # Get number of frames in batch and available sigmas
@@ -231,9 +233,10 @@ class StreamBatchSampler(ControlNodeBase):
         print(f"[StreamBatchSampler] Input sigmas: {sigmas}")
         print(f"[StreamBatchSampler] Input noise shape: {noise.shape}, min: {noise.min():.3f}, max: {noise.max():.3f}")
         
-        # Verify batch size matches number of timesteps
-        if batch_size != num_sigmas:
-            raise ValueError(f"Batch size ({batch_size}) must match number of timesteps ({num_sigmas})")
+        # Calculate total batch size based on frame_buffer_size and number of timesteps
+        total_batch_size = self.frame_buffer_size * num_sigmas
+        if batch_size != total_batch_size:
+            raise ValueError(f"Batch size ({batch_size}) must match frame_buffer_size * num_timesteps ({total_batch_size})")
         
         # Pre-compute alpha and beta terms
         alpha_prod_t = (sigmas[:-1] / sigmas[0]).view(-1, 1, 1, 1)  # [B,1,1,1]
@@ -272,7 +275,7 @@ class StreamBatchSampler(ControlNodeBase):
             print(f"[StreamBatchSampler] Using sigmas for denoising: {sigma_batch}")
             
             # Process with or without CFG
-            if self.use_cfg:
+            if self.guidance_scale > 1.0:
                 denoised_batch = self.process_with_cfg(model, x, sigma_batch, extra_args)
             else:
                 denoised_batch = model(x, sigma_batch, **extra_args)
@@ -293,7 +296,7 @@ class StreamBatchSampler(ControlNodeBase):
                 self.x_t_latent_buffer = None
                 
             # Apply similarity filter if enabled
-            if self.use_similarity_filter:
+            if self.similarity_threshold > 0:
                 if self.similarity_filter is None:
                     from .controls.similar_image_filter import SimilarImageFilter
                     self.similarity_filter = SimilarImageFilter(
@@ -313,28 +316,59 @@ class StreamBatchSampler(ControlNodeBase):
         
         return x_0_pred_out
     
-    def update(self, num_steps=4, use_cfg=False, cfg_type="self", guidance_scale=1.2, delta=1.0, prompt="", 
-              use_similarity_filter=False, similarity_threshold=0.98, max_skip_frames=10, always_execute=True):
-        """Create sampler with specified settings"""
-        self.num_steps = num_steps
-        self.use_cfg = use_cfg
+    def buffer(self, latent, frame_buffer_size=1, num_timesteps=2, always_execute=True):
+        """Add new frame to buffer and return batch when ready"""
+        self.frame_buffer_size = frame_buffer_size
+        self.num_timesteps = num_timesteps
+        
+        # Extract latent tensor from input and remove batch dimension if present
+        x = latent["samples"]
+        if x.dim() == 4:  # [B,C,H,W]
+            x = x.squeeze(0)  # Remove batch dimension -> [C,H,W]
+        
+        # Add new frame to buffer
+        if len(self.frame_buffer) == 0:
+            # First frame - initialize buffer with copies
+            self.frame_buffer = [x.clone() for _ in range(self.frame_buffer_size)]
+            print(f"[StreamFrameBuffer] Initialized buffer with {self.frame_buffer_size} copies of first frame")
+        else:
+            # Shift frames forward and add new frame
+            self.frame_buffer.pop(0)  # Remove oldest frame
+            self.frame_buffer.append(x.clone())  # Add new frame
+            print(f"[StreamFrameBuffer] Added new frame to buffer")
+            
+        # Create batch by repeating frames for each timestep
+        frames = torch.stack(self.frame_buffer, dim=0)  # [buffer_size,C,H,W]
+        batch = frames.repeat_interleave(self.num_timesteps, dim=0)  # [buffer_size*num_timesteps,C,H,W]
+        print(f"[StreamFrameBuffer] Created batch with shape: {batch.shape}")
+        
+        # Return as latent dict
+        return {"samples": batch}
+    
+    def update(self, latent, num_timesteps, frame_buffer_size=1, cfg_type="self", guidance_scale=1.2, delta=1.0, prompt="", 
+              similarity_threshold=0.0, max_skip_frames=10, always_execute=True):
+        """Create sampler with specified settings and process frame"""
+        self.frame_buffer_size = frame_buffer_size
         self.cfg_type = cfg_type
         self.guidance_scale = guidance_scale
         self.delta = delta
         self.prompt = prompt
+        self.num_timesteps = num_timesteps
         
         # Update similarity filter settings
-        self.use_similarity_filter = use_similarity_filter
         self.similarity_threshold = similarity_threshold
         self.max_skip_frames = max_skip_frames
         if self.similarity_filter is not None:
             self.similarity_filter.set_threshold(similarity_threshold)
             self.similarity_filter.set_max_skip_frame(max_skip_frames)
         
-        # Create sampler without extra_args - we use self.prompt directly in sample()
+        # Create sampler with cusatom sample function
         sampler = comfy.samplers.KSAMPLER(self.sample)
-        return (sampler,)
-
+        
+        # Process frame
+        buffered = self.buffer(latent)
+        return (sampler, buffered)
+        
 
 class StreamScheduler(ControlNodeBase):
     """Implements StreamDiffusion's efficient timestep selection"""
@@ -393,56 +427,3 @@ class StreamScheduler(ControlNodeBase):
         return (selected_sigmas,)
 
 
-class StreamFrameBuffer(ControlNodeBase):
-    """Accumulates frames to enable staggered batch denoising like StreamDiffusion"""
-    
-    RETURN_TYPES = ("LATENT",)
-    FUNCTION = "update"
-    CATEGORY = "real-time/sampling"
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        inputs = super().INPUT_TYPES()
-        inputs["required"].update({
-            "latent": ("LATENT",),
-            "buffer_size": ("INT", {
-                "default": 4,
-                "min": 1,
-                "max": 10,
-                "step": 1,
-                "tooltip": "Number of frames to buffer before starting batch processing. Should match number of denoising steps."
-            }),
-        })
-        return inputs
-    
-    def __init__(self):
-        super().__init__()
-        self.frame_buffer = []  # List to store incoming frames
-        self.buffer_size = None
-        
-    def update(self, latent, buffer_size=4, always_execute=True):
-        """Add new frame to buffer and return batch when ready"""
-        self.buffer_size = buffer_size
-        
-        # Extract latent tensor from input and remove batch dimension if present
-        x = latent["samples"]
-        if x.dim() == 4:  # [B,C,H,W]
-            x = x.squeeze(0)  # Remove batch dimension -> [C,H,W]
-        
-        # Add new frame to buffer
-        if len(self.frame_buffer) == 0:
-            # First frame - initialize buffer with copies
-            self.frame_buffer = [x.clone() for _ in range(self.buffer_size)]
-            print(f"[StreamFrameBuffer] Initialized buffer with {self.buffer_size} copies of first frame")
-        else:
-            # Shift frames forward and add new frame
-            self.frame_buffer.pop(0)  # Remove oldest frame
-            self.frame_buffer.append(x.clone())  # Add new frame
-            print(f"[StreamFrameBuffer] Added new frame to buffer")
-            
-        # Stack frames into batch
-        batch = torch.stack(self.frame_buffer, dim=0)  # [B,C,H,W]
-        print(f"[StreamFrameBuffer] Created batch with shape: {batch.shape}")
-        
-        # Return as latent dict
-        return ({"samples": batch},)
