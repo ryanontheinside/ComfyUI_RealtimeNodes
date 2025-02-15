@@ -45,7 +45,7 @@ class StreamBatchSampler(ControlNodeBase):
                 "tooltip": "Only used with 'self' CFG. Controls strength of self-guidance. Higher values = stronger guidance but more artifacts. Default 1.0 works well"
             }),
             "similarity_threshold": ("FLOAT", {
-                "default": 0.0,
+                "default": 0.98,
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.01,
@@ -377,6 +377,11 @@ class StreamScheduler(ControlNodeBase):
     FUNCTION = "update"
     CATEGORY = "real-time/sampling"
 
+    def __init__(self):
+        super().__init__()
+        self.cached_indices = None
+        self.last_t_index_list = None
+
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
@@ -384,7 +389,7 @@ class StreamScheduler(ControlNodeBase):
             "model": ("MODEL",),
             "t_index_list": ("STRING", {
                 "default": "32,45",
-                "tooltip": "Comma-separated list of timesteps to actually use for denoising. Examples: '32,45' for img2img or '0,16,32,45' for txt2img"
+                "tooltip": "Comma-separated list of timesteps to actually use for denoising. For LCM: use '32,45' for img2img or '0,16,32,45' for txt2img. For SDXL Turbo: use '45,49' for 2 steps or '49' for 1 step (Turbo works best with steps near the end of denoising)"
             }),
             "num_inference_steps": ("INT", {
                 "default": 50,
@@ -396,24 +401,37 @@ class StreamScheduler(ControlNodeBase):
         })
         return inputs
 
+    def parse_timesteps(self, t_index_list):
+        """Parse and sort timesteps, with caching"""
+        if t_index_list == self.last_t_index_list and self.cached_indices is not None:
+            return self.cached_indices
+            
+        try:
+            # Parse and sort in reverse order once
+            indices = sorted([int(t.strip()) for t in t_index_list.split(",")], reverse=True)
+            self.last_t_index_list = t_index_list
+            self.cached_indices = indices
+            return indices
+        except ValueError as e:
+            print(f"Error parsing timesteps: {e}. Using default [32,45]")
+            self.last_t_index_list = "32,45"
+            self.cached_indices = [45, 32]  # Already sorted in reverse
+            return self.cached_indices
+
     def update(self, model, t_index_list="32,45", num_inference_steps=50, always_execute=True):
         # Get model's sampling parameters
         model_sampling = model.get_model_object("model_sampling")
         
-        # Parse timestep list
-        try:
-            t_index_list = [int(t.strip()) for t in t_index_list.split(",")]
-        except ValueError as e:
-            print(f"Error parsing timesteps: {e}. Using default [32,45]")
-            t_index_list = [32, 45]
+        # Get parsed and sorted timesteps
+        t_indices = self.parse_timesteps(t_index_list)
             
         # Create full schedule using normal scheduler
         full_sigmas = comfy.samplers.normal_scheduler(model_sampling, num_inference_steps)
         
-        # Select only the sigmas at our desired indices, but in reverse order
-        # This ensures we go from high noise to low noise
+        # Select only the sigmas at our desired indices
+        # No need to sort t_indices here since they're already sorted
         selected_sigmas = []
-        for t in sorted(t_index_list, reverse=True):  # Sort in reverse to go from high noise to low
+        for t in t_indices:
             if t < 0 or t >= num_inference_steps:
                 print(f"Warning: timestep {t} out of range [0,{num_inference_steps}), skipping")
                 continue
@@ -422,8 +440,9 @@ class StreamScheduler(ControlNodeBase):
         # Add final sigma
         selected_sigmas.append(0.0)
         
-        # Convert to tensor and move to appropriate device
-        selected_sigmas = torch.FloatTensor(selected_sigmas).to(comfy.model_management.get_torch_device())
+        # Create tensor directly on target device
+        device = comfy.model_management.get_torch_device()
+        selected_sigmas = torch.tensor(selected_sigmas, dtype=torch.float32, device=device)
         return (selected_sigmas,)
 
 
