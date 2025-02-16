@@ -166,7 +166,7 @@ class StreamBatchSampler(ControlNodeBase):
             print(f"[StreamBatchSampler] Setting up cross attention with prompt: {prompt}")
 
         def optimized_attention_forward(module, x, context=None, mask=None):
-            """Optimized cross attention with KV caching"""
+            """Optimized cross attention with KV caching and ComfyUI's optimizations"""
             batch_size = x.shape[0]
             
             # Generate query from input
@@ -190,24 +190,9 @@ class StreamBatchSampler(ControlNodeBase):
                 k = k.expand(batch_size, -1, -1)
                 v = v.expand(batch_size, -1, -1)
             
-            # Reshape for attention
-            head_dim = q.shape[-1] // module.heads
-            q = q.view(batch_size, -1, module.heads, head_dim).transpose(1, 2)
-            k = k.view(-1, k.shape[1], module.heads, head_dim).transpose(1, 2)
-            v = v.view(-1, v.shape[1], module.heads, head_dim).transpose(1, 2)
-            
-            # Compute attention
-            scale = 1.0 / math.sqrt(head_dim)
-            scores = torch.matmul(q, k.transpose(-2, -1)) * scale
-            
-            if mask is not None:
-                scores = scores + mask
-            
-            attn = torch.softmax(scores, dim=-1)
-            out = torch.matmul(attn, v)
-            
-            # Reshape output
-            out = out.transpose(1, 2).reshape(batch_size, -1, module.heads * head_dim)
+            # Use ComfyUI's optimized attention
+            from comfy.ldm.modules.attention import optimized_attention
+            out = optimized_attention(q, k, v, module.heads, mask=mask)
             return module.to_out[0](out)
 
         # Get the actual model from the sampler
@@ -226,11 +211,6 @@ class StreamBatchSampler(ControlNodeBase):
             # Remove old hooks if they exist
             if self.cross_attention_hook is not None:
                 self.cross_attention_hook.remove()
-            
-            # Note: Alternative optimization could replace hooks with direct function replacement:
-            # module.forward = lambda *args, **kwargs: optimized_attention_forward(module, *args, **kwargs)
-            # This is faster (no hook overhead) but more intrusive and harder to clean up.
-            # Current hook system is safer and more maintainable.
             
             def create_cross_attn_patch(module, input, output):
                 """Hook to replace cross attention modules with optimized version"""
@@ -260,17 +240,19 @@ class StreamBatchSampler(ControlNodeBase):
         
         # Get number of frames in batch and available sigmas
         batch_size = noise.shape[0]
-        num_sigmas = len(sigmas) - 1  # Subtract 1 because last sigma is the target (0.0)
         
         # Calculate total batch size based on frame_buffer_size and number of timesteps
-        total_batch_size = self.frame_buffer_size * num_sigmas
+        total_batch_size = self.frame_buffer_size * self.num_timesteps
         if batch_size != total_batch_size:
             raise ValueError(f"Batch size ({batch_size}) must match frame_buffer_size * num_timesteps ({total_batch_size})")
         
         # Pre-compute alpha and beta terms if sigmas changed
         if self.cached_sigmas is None or not torch.allclose(sigmas, self.cached_sigmas):
             self.cached_sigmas = sigmas.clone()
-            self.cached_alpha_prod_t = (sigmas[:-1] / sigmas[0]).view(-1, 1, 1, 1)  # [B,1,1,1]
+            # Adjust alpha/beta calculation to use actual timesteps
+            self.cached_alpha_prod_t = torch.ones((self.num_timesteps,1,1,1), device=sigmas.device)
+            for i in range(self.num_timesteps):
+                self.cached_alpha_prod_t[i] = sigmas[i] / sigmas[0]
             self.cached_beta_prod_t = (1 - self.cached_alpha_prod_t)
             if self.debug:
                 print("[StreamBatchSampler] Cached new alpha/beta values")
@@ -286,27 +268,27 @@ class StreamBatchSampler(ControlNodeBase):
             
         # Scale noise for each frame based on its sigma - vectorized with caching
         sigma_scaled_noise = self.get_expanded_noise(batch_size)
-        x = noise + sigma_scaled_noise * sigmas[:-1].view(-1, 1, 1, 1)
+        x = noise + sigma_scaled_noise * sigmas[:self.num_timesteps].view(-1, 1, 1, 1)
             
         # Initialize frame buffer if needed
-        if self.x_t_latent_buffer is None and num_sigmas > 1:
+        if self.x_t_latent_buffer is None and self.num_timesteps > 1:
             self.x_t_latent_buffer = x[0].clone()  # Initialize with noised first frame
             
         # Use buffer for first frame to maintain temporal consistency
-        if num_sigmas > 1:
+        if self.num_timesteps > 1:
             x = torch.cat([self.x_t_latent_buffer.unsqueeze(0), x[1:]], dim=0)
             
         # Run model on entire batch at once
         with torch.no_grad():
             # Process all frames in parallel
-            sigma_batch = sigmas[:-1]
+            sigma_batch = sigmas[:self.num_timesteps]
             # Process with or without CFG
             if self.guidance_scale > 1.0:
                 denoised_batch = self.process_with_cfg(model, x, sigma_batch, extra_args)
             else:
                 denoised_batch = model(x, sigma_batch, **extra_args)
             # Update buffer with intermediate results
-            if num_sigmas > 1:
+            if self.num_timesteps > 1:
                 # Store result from first frame as buffer for next iteration
                 self.x_t_latent_buffer = denoised_batch[0].clone()
                 # Return result from last frame
