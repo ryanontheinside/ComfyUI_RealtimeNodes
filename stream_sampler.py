@@ -77,9 +77,12 @@ class StreamBatchSampler(ControlNodeBase):
     def __init__(self):
         super().__init__()
         self.frame_buffer_size = None
-        self.frame_buffer = []  # List to store incoming frames
+        self.frame_buffer = None  # Will be a tensor instead of list
         self.x_t_latent_buffer = None
         self.stock_noise = None
+        self.cached_noise = {}  # Cache for different expanded versions
+        self.debug = False  # Debug flag for print statements
+        self.last_batch_shape = None  # Track last batch shape
         # Add CFG state
         self.cfg_type = "self"
         self.guidance_scale = 1.2
@@ -96,7 +99,30 @@ class StreamBatchSampler(ControlNodeBase):
         self.similarity_filter = None
         # Add buffer state
         self.num_timesteps = None
+        # Add caching for alpha/beta
+        self.cached_sigmas = None
+        self.cached_alpha_prod_t = None
+        self.cached_beta_prod_t = None
     
+    def get_expanded_noise(self, batch_size, scale=1.0):
+        """Get expanded noise with caching based on batch size and scale"""
+        cache_key = (batch_size, scale)
+        if self.stock_noise is None:
+            return None
+            
+        if cache_key not in self.cached_noise:
+            self.cached_noise[cache_key] = self.stock_noise.unsqueeze(0).expand(batch_size, -1, -1, -1) * scale
+            if self.debug:
+                print(f"[StreamBatchSampler] Cached expanded noise for batch_size={batch_size}, scale={scale}")
+            
+        return self.cached_noise[cache_key]
+
+    def invalidate_noise_cache(self):
+        """Clear all cached noise when stock noise changes"""
+        self.cached_noise.clear()
+        if self.debug:
+            print("[StreamBatchSampler] Cleared noise cache")
+
     def process_with_cfg(self, model, x, sigma_batch, extra_args):
         """Apply classifier-free guidance based on current cfg_type"""
         if self.cfg_type == "none" or self.guidance_scale <= 1.0:
@@ -119,11 +145,14 @@ class StreamBatchSampler(ControlNodeBase):
             noise_pred_text = model_output[1:]
             # Update stock noise with uncond prediction
             self.stock_noise = noise_pred_uncond[0].clone()
+            self.invalidate_noise_cache()
         else:  # self
             # Use stock noise for uncond
             model_output = model(x, sigma_batch, **extra_args)
-            noise_pred_text = model_output
-            noise_pred_uncond = self.stock_noise.unsqueeze(0).expand_as(noise_pred_text) * self.delta
+            noise_pred_text = model_output 
+            
+            #TODO:  Eq.7 ϵ_cfg = δϵ̃ + γ(ϵ_c - δϵ̃)
+            noise_pred_uncond = self.get_expanded_noise(x.shape[0], scale=self.delta)
             
         # Combine predictions with guidance
         return noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
@@ -133,8 +162,9 @@ class StreamBatchSampler(ControlNodeBase):
         if not prompt:  # Don't use optimization if no prompt provided
             return model
 
-        print(f"[StreamBatchSampler] Setting up cross attention with prompt: {prompt}")
-        
+        if self.debug:
+            print(f"[StreamBatchSampler] Setting up cross attention with prompt: {prompt}")
+
         def optimized_attention_forward(module, x, context=None, mask=None):
             """Optimized cross attention with KV caching"""
             batch_size = x.shape[0]
@@ -144,13 +174,15 @@ class StreamBatchSampler(ControlNodeBase):
             
             # Check if we need to recompute KV cache
             if self.kv_cache is None or self.last_prompt != prompt:
-                print("[StreamBatchSampler] Computing new KV cache")
+                if self.debug:
+                    print("[StreamBatchSampler] Computing new KV cache")
                 k = module.to_k(context)
                 v = module.to_v(context)
                 self.kv_cache = (k, v)
                 self.last_prompt = prompt
             else:
-                print("[StreamBatchSampler] Using cached KV pairs")
+                if self.debug:
+                    print("[StreamBatchSampler] Using cached KV pairs")
                 k, v = self.kv_cache
             
             # Handle batch size expansion if needed
@@ -178,29 +210,36 @@ class StreamBatchSampler(ControlNodeBase):
             out = out.transpose(1, 2).reshape(batch_size, -1, module.heads * head_dim)
             return module.to_out[0](out)
 
-        def create_cross_attn_patch(module, input, output):
-            """Hook to replace cross attention modules with optimized version"""
-            if isinstance(module, torch.nn.Module) and hasattr(module, "to_q"):
-                if not hasattr(module, "_original_forward"):
-                    module._original_forward = module.forward
-                module.forward = lambda *args, **kwargs: optimized_attention_forward(module, *args, **kwargs)
-            return output
-
         # Get the actual model from the sampler
         if hasattr(model, "model"):
             unet = model.model
         else:
-            print("[StreamBatchSampler] Warning: Could not find UNet model in sampler")
+            if self.debug:
+                print("[StreamBatchSampler] Warning: Could not find UNet model in sampler")
             return model
 
         # Only set up hooks if prompt has changed
         model_hash = hash(str(unet))
         if model_hash != self.last_model_hash or self.last_prompt != prompt:
-            print("[StreamBatchSampler] Setting up new cross attention hooks")
+            if self.debug:
+                print("[StreamBatchSampler] Setting up new cross attention hooks")
             # Remove old hooks if they exist
             if self.cross_attention_hook is not None:
                 self.cross_attention_hook.remove()
             
+            # Note: Alternative optimization could replace hooks with direct function replacement:
+            # module.forward = lambda *args, **kwargs: optimized_attention_forward(module, *args, **kwargs)
+            # This is faster (no hook overhead) but more intrusive and harder to clean up.
+            # Current hook system is safer and more maintainable.
+            
+            def create_cross_attn_patch(module, input, output):
+                """Hook to replace cross attention modules with optimized version"""
+                if isinstance(module, torch.nn.Module) and hasattr(module, "to_q"):
+                    if not hasattr(module, "_original_forward"):
+                        module._original_forward = module.forward
+                    module.forward = lambda *args, **kwargs: optimized_attention_forward(module, *args, **kwargs)
+                return output
+
             # Register hooks on cross attention blocks
             def register_hooks(module):
                 if isinstance(module, torch.nn.Module) and hasattr(module, "to_q"):
@@ -214,81 +253,62 @@ class StreamBatchSampler(ControlNodeBase):
     def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
         """Sample with staggered batch denoising steps"""
         extra_args = {} if extra_args is None else extra_args
-        print(f"[StreamBatchSampler] Starting sampling with {len(sigmas)-1} steps")
         
         # Set up cross attention optimization if prompt provided
         if self.prompt:
             model = self.setup_cross_attention(model, self.prompt)
-            print("[StreamBatchSampler] Cross attention optimization enabled")
-        else:
-            print("[StreamBatchSampler] Cross attention optimization disabled (no prompt)")
-
-        if self.guidance_scale > 1.0:
-            print(f"[StreamBatchSampler] CFG enabled - type: {self.cfg_type}, scale: {self.guidance_scale}, delta: {self.delta}")
         
         # Get number of frames in batch and available sigmas
         batch_size = noise.shape[0]
         num_sigmas = len(sigmas) - 1  # Subtract 1 because last sigma is the target (0.0)
-        
-        print(f"[StreamBatchSampler] Input sigmas: {sigmas}")
-        print(f"[StreamBatchSampler] Input noise shape: {noise.shape}, min: {noise.min():.3f}, max: {noise.max():.3f}")
         
         # Calculate total batch size based on frame_buffer_size and number of timesteps
         total_batch_size = self.frame_buffer_size * num_sigmas
         if batch_size != total_batch_size:
             raise ValueError(f"Batch size ({batch_size}) must match frame_buffer_size * num_timesteps ({total_batch_size})")
         
-        # Pre-compute alpha and beta terms
-        alpha_prod_t = (sigmas[:-1] / sigmas[0]).view(-1, 1, 1, 1)  # [B,1,1,1]
-        beta_prod_t = (1 - alpha_prod_t)
+        # Pre-compute alpha and beta terms if sigmas changed
+        if self.cached_sigmas is None or not torch.allclose(sigmas, self.cached_sigmas):
+            self.cached_sigmas = sigmas.clone()
+            self.cached_alpha_prod_t = (sigmas[:-1] / sigmas[0]).view(-1, 1, 1, 1)  # [B,1,1,1]
+            self.cached_beta_prod_t = (1 - self.cached_alpha_prod_t)
+            if self.debug:
+                print("[StreamBatchSampler] Cached new alpha/beta values")
         
-        print(f"[StreamBatchSampler] Alpha values: {alpha_prod_t.view(-1)}")
-        print(f"[StreamBatchSampler] Beta values: {beta_prod_t.view(-1)}")
+        alpha_prod_t = self.cached_alpha_prod_t
+        beta_prod_t = self.cached_beta_prod_t
         
         # Initialize stock noise if needed
         if self.stock_noise is None:
             self.stock_noise = torch.randn_like(noise[0])  # Random noise instead of zeros
-            print(f"[StreamBatchSampler] Initialized random stock noise with shape: {self.stock_noise.shape}")
+            if self.debug:
+                print(f"[StreamBatchSampler] Initialized random stock noise")
             
-        # Scale noise for each frame based on its sigma
-        scaled_noise = []
-        for i in range(batch_size):
-            frame_noise = noise[i] + self.stock_noise * sigmas[i]  # Add scaled noise to input
-            scaled_noise.append(frame_noise)
-        x = torch.stack(scaled_noise, dim=0)
-        print(f"[StreamBatchSampler] Scaled noise shape: {x.shape}, min: {x.min():.3f}, max: {x.max():.3f}")
+        # Scale noise for each frame based on its sigma - vectorized with caching
+        sigma_scaled_noise = self.get_expanded_noise(batch_size)
+        x = noise + sigma_scaled_noise * sigmas[:-1].view(-1, 1, 1, 1)
             
         # Initialize frame buffer if needed
         if self.x_t_latent_buffer is None and num_sigmas > 1:
             self.x_t_latent_buffer = x[0].clone()  # Initialize with noised first frame
-            print(f"[StreamBatchSampler] Initialized buffer with shape: {self.x_t_latent_buffer.shape}")
             
         # Use buffer for first frame to maintain temporal consistency
         if num_sigmas > 1:
             x = torch.cat([self.x_t_latent_buffer.unsqueeze(0), x[1:]], dim=0)
-            print(f"[StreamBatchSampler] Combined with buffer, shape: {x.shape}")
             
         # Run model on entire batch at once
         with torch.no_grad():
             # Process all frames in parallel
             sigma_batch = sigmas[:-1]
-            print(f"[StreamBatchSampler] Using sigmas for denoising: {sigma_batch}")
-            
             # Process with or without CFG
             if self.guidance_scale > 1.0:
                 denoised_batch = self.process_with_cfg(model, x, sigma_batch, extra_args)
             else:
                 denoised_batch = model(x, sigma_batch, **extra_args)
-                
-            print(f"[StreamBatchSampler] Denoised batch shape: {denoised_batch.shape}")
-            print(f"[StreamBatchSampler] Denoised stats - min: {denoised_batch.min():.3f}, max: {denoised_batch.max():.3f}")
-            
             # Update buffer with intermediate results
             if num_sigmas > 1:
                 # Store result from first frame as buffer for next iteration
                 self.x_t_latent_buffer = denoised_batch[0].clone()
-                print(f"[StreamBatchSampler] Updated buffer with shape: {self.x_t_latent_buffer.shape}")
-                
                 # Return result from last frame
                 x_0_pred_out = denoised_batch[-1].unsqueeze(0)
             else:
@@ -306,9 +326,11 @@ class StreamBatchSampler(ControlNodeBase):
                 filtered_out = self.similarity_filter(x_0_pred_out)
                 if filtered_out is not None:
                     x_0_pred_out = filtered_out
-                    print("[StreamBatchSampler] Frame passed similarity filter")
+                    if self.debug:
+                        print("[StreamBatchSampler] Frame passed similarity filter")
                 else:
-                    print("[StreamBatchSampler] Frame skipped by similarity filter")
+                    if self.debug:
+                        print("[StreamBatchSampler] Frame skipped by similarity filter")
                 
             # Call callback if provided
             if callback is not None:
@@ -326,21 +348,20 @@ class StreamBatchSampler(ControlNodeBase):
         if x.dim() == 4:  # [B,C,H,W]
             x = x.squeeze(0)  # Remove batch dimension -> [C,H,W]
         
-        # Add new frame to buffer
-        if len(self.frame_buffer) == 0:
-            # First frame - initialize buffer with copies
-            self.frame_buffer = [x.clone() for _ in range(self.frame_buffer_size)]
-            print(f"[StreamFrameBuffer] Initialized buffer with {self.frame_buffer_size} copies of first frame")
-        else:
-            # Shift frames forward and add new frame
-            self.frame_buffer.pop(0)  # Remove oldest frame
-            self.frame_buffer.append(x.clone())  # Add new frame
-            print(f"[StreamFrameBuffer] Added new frame to buffer")
-            
+        # Initialize or resize frame buffer if needed
+        if self.frame_buffer is None or self.frame_buffer.shape[0] != self.frame_buffer_size:
+            # Pre-allocate tensor buffer
+            self.frame_buffer = torch.zeros((self.frame_buffer_size,) + x.shape, dtype=x.dtype, device=x.device)
+            if self.debug:
+                print(f"[StreamFrameBuffer] Pre-allocated tensor buffer for {self.frame_buffer_size} frames")
+        
+        # Rotate frames and add new frame using tensor operations
+        if self.frame_buffer_size > 1:
+            self.frame_buffer = torch.roll(self.frame_buffer, -1, dims=0)
+        self.frame_buffer[-1] = x
+        
         # Create batch by repeating frames for each timestep
-        frames = torch.stack(self.frame_buffer, dim=0)  # [buffer_size,C,H,W]
-        batch = frames.repeat_interleave(self.num_timesteps, dim=0)  # [buffer_size*num_timesteps,C,H,W]
-        print(f"[StreamFrameBuffer] Created batch with shape: {batch.shape}")
+        batch = self.frame_buffer.repeat_interleave(self.num_timesteps, dim=0)  # [buffer_size*num_timesteps,C,H,W]
         
         # Return as latent dict
         return {"samples": batch}
