@@ -103,6 +103,9 @@ class StreamBatchSampler(ControlNodeBase):
         self.cached_sigmas = None
         self.cached_alpha_prod_t = None
         self.cached_beta_prod_t = None
+        # Add noise sequence and step counter
+        self.noise_sequence = None
+        self.step_counter = 0
     
     def get_expanded_noise(self, batch_size, scale=1.0):
         """Get expanded noise with caching based on batch size and scale"""
@@ -260,12 +263,15 @@ class StreamBatchSampler(ControlNodeBase):
         alpha_prod_t = self.cached_alpha_prod_t
         beta_prod_t = self.cached_beta_prod_t
         
-        # Initialize stock noise if needed
+        # Replace stock_noise initialization with sequence-based
         if self.stock_noise is None:
-            self.stock_noise = torch.randn_like(noise[0])  # Random noise instead of zeros
-            if self.debug:
-                print(f"[StreamBatchSampler] Initialized random stock noise")
-            
+            # Get current step's noise from pre-generated sequence
+            current_noise = self.noise_sequence[self.step_counter % self.num_timesteps]
+            self.stock_noise = current_noise.clone()
+        
+        # Update step counter for next frame
+        self.step_counter += 1
+        
         # Scale noise for each frame based on its sigma - vectorized with caching
         sigma_scaled_noise = self.get_expanded_noise(batch_size)
         x = noise + sigma_scaled_noise * sigmas[:self.num_timesteps].view(-1, 1, 1, 1)
@@ -370,6 +376,16 @@ class StreamBatchSampler(ControlNodeBase):
         
         # Process frame
         buffered = self.buffer(latent)
+        
+        # Add noise sequence initialization
+        if self.noise_sequence is None or self.noise_sequence.shape[0] != num_timesteps:
+            latent_shape = latent["samples"].shape[1:]  # [C,H,W]
+            self.noise_sequence = torch.randn(
+                (num_timesteps,) + latent_shape,  # Proper size format
+                device=comfy.model_management.get_torch_device(),
+                dtype=latent["samples"].dtype
+            )
+        
         return (sampler, buffered)
         
 
