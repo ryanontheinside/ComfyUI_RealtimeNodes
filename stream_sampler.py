@@ -123,11 +123,11 @@ class StreamBatchSampler(ControlNodeBase):
     def invalidate_noise_cache(self):
         """Clear all cached noise when stock noise changes"""
         self.cached_noise.clear()
-        if self.debug:
-            print("[StreamBatchSampler] Cleared noise cache")
+
 
     def process_with_cfg(self, model, x, sigma_batch, extra_args):
         """Apply classifier-free guidance based on current cfg_type"""
+        # Handle no guidance cases first
         if self.cfg_type == "none" or self.guidance_scale <= 1.0:
             # No guidance - process batch normally
             return model(x, sigma_batch, **extra_args)
@@ -165,9 +165,6 @@ class StreamBatchSampler(ControlNodeBase):
         if not prompt:  # Don't use optimization if no prompt provided
             return model
 
-        if self.debug:
-            print(f"[StreamBatchSampler] Setting up cross attention with prompt: {prompt}")
-
         def optimized_attention_forward(module, x, context=None, mask=None):
             """Optimized cross attention with KV caching and ComfyUI's optimizations"""
             batch_size = x.shape[0]
@@ -202,15 +199,10 @@ class StreamBatchSampler(ControlNodeBase):
         if hasattr(model, "model"):
             unet = model.model
         else:
-            if self.debug:
-                print("[StreamBatchSampler] Warning: Could not find UNet model in sampler")
             return model
 
         # Only set up hooks if prompt has changed
-        model_hash = hash(str(unet))
-        if model_hash != self.last_model_hash or self.last_prompt != prompt:
-            if self.debug:
-                print("[StreamBatchSampler] Setting up new cross attention hooks")
+        if self.last_prompt != prompt:
             # Remove old hooks if they exist
             if self.cross_attention_hook is not None:
                 self.cross_attention_hook.remove()
@@ -229,9 +221,37 @@ class StreamBatchSampler(ControlNodeBase):
                     self.cross_attention_hook = module.register_forward_hook(create_cross_attn_patch)
             
             unet.apply(register_hooks)
-            self.last_model_hash = model_hash
+            self.last_prompt = prompt
         
         return model
+
+    def apply_similarity_filter(self, x_0_pred_out):
+        """Apply similarity filter to skip similar frames if enabled"""
+        if not self.similarity_threshold > 0:
+            return x_0_pred_out
+            
+        if self.similarity_filter is None:
+            from .controls.similar_image_filter import SimilarImageFilter
+            self.similarity_filter = SimilarImageFilter(
+                threshold=self.similarity_threshold,
+                max_skip_frame=self.max_skip_frames
+            )
+        filtered_out = self.similarity_filter(x_0_pred_out)
+        if filtered_out is not None:
+            return filtered_out
+        
+        return x_0_pred_out
+
+    def compute_alpha_beta(self, sigmas):
+        """Pre-compute alpha and beta terms for the given sigmas"""
+        self.cached_sigmas = sigmas.clone()
+        # Adjust alpha/beta calculation to use actual timesteps
+        self.cached_alpha_prod_t = torch.ones((self.num_timesteps,1,1,1), device=sigmas.device)
+        for i in range(self.num_timesteps):
+            self.cached_alpha_prod_t[i] = sigmas[i] / sigmas[0]
+        self.cached_beta_prod_t = (1 - self.cached_alpha_prod_t)
+        if self.debug:
+            print("[StreamBatchSampler] Computed new alpha/beta terms")
 
     def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
         """Sample with staggered batch denoising steps"""
@@ -249,19 +269,9 @@ class StreamBatchSampler(ControlNodeBase):
         if batch_size != total_batch_size:
             raise ValueError(f"Batch size ({batch_size}) must match frame_buffer_size * num_timesteps ({total_batch_size})")
         
-        # Pre-compute alpha and beta terms if sigmas changed
-        if self.cached_sigmas is None or not torch.allclose(sigmas, self.cached_sigmas):
-            self.cached_sigmas = sigmas.clone()
-            # Adjust alpha/beta calculation to use actual timesteps
-            self.cached_alpha_prod_t = torch.ones((self.num_timesteps,1,1,1), device=sigmas.device)
-            for i in range(self.num_timesteps):
-                self.cached_alpha_prod_t[i] = sigmas[i] / sigmas[0]
-            self.cached_beta_prod_t = (1 - self.cached_alpha_prod_t)
-            if self.debug:
-                print("[StreamBatchSampler] Cached new alpha/beta values")
-        
-        alpha_prod_t = self.cached_alpha_prod_t
-        beta_prod_t = self.cached_beta_prod_t
+        # Pre-compute alpha and beta terms if not already computed
+        if self.cached_sigmas is None:
+            self.compute_alpha_beta(sigmas)
         
         # Replace stock_noise initialization with sequence-based
         if self.stock_noise is None:
@@ -288,11 +298,9 @@ class StreamBatchSampler(ControlNodeBase):
         with torch.no_grad():
             # Process all frames in parallel
             sigma_batch = sigmas[:self.num_timesteps]
-            # Process with or without CFG
-            if self.guidance_scale > 1.0:
-                denoised_batch = self.process_with_cfg(model, x, sigma_batch, extra_args)
-            else:
-                denoised_batch = model(x, sigma_batch, **extra_args)
+            # Process with CFG handling inside process_with_cfg
+            denoised_batch = self.process_with_cfg(model, x, sigma_batch, extra_args)
+            
             # Update buffer with intermediate results
             if self.num_timesteps > 1:
                 # Store result from first frame as buffer for next iteration
@@ -304,25 +312,11 @@ class StreamBatchSampler(ControlNodeBase):
                 self.x_t_latent_buffer = None
                 
             # Apply similarity filter if enabled
-            if self.similarity_threshold > 0:
-                if self.similarity_filter is None:
-                    from .controls.similar_image_filter import SimilarImageFilter
-                    self.similarity_filter = SimilarImageFilter(
-                        threshold=self.similarity_threshold,
-                        max_skip_frame=self.max_skip_frames
-                    )
-                filtered_out = self.similarity_filter(x_0_pred_out)
-                if filtered_out is not None:
-                    x_0_pred_out = filtered_out
-                    if self.debug:
-                        print("[StreamBatchSampler] Frame passed similarity filter")
-                else:
-                    if self.debug:
-                        print("[StreamBatchSampler] Frame skipped by similarity filter")
+            x_0_pred_out = self.apply_similarity_filter(x_0_pred_out)
                 
             # Call callback if provided
             if callback is not None:
-                callback({'x': x_0_pred_out, 'i': 0, 'sigma': sigmas[0], 'sigma_hat': sigmas[0], 'denoised': denoised_batch[-1:]})
+                callback({'x': x_0_pred_out, 'i': 0, 'sigma': sigmas[0], 'sigma_hat': sigmas[0], 'denoised': x_0_pred_out})
         
         return x_0_pred_out
     
