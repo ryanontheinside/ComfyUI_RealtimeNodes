@@ -32,6 +32,7 @@ class StreamBatchSampler(ControlNodeBase):
         self.frame_buffer = []
         self.x_t_latent_buffer = None
         self.stock_noise = None
+        self.is_txt2img_mode = False
     
     def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
         """Sample with staggered batch denoising steps"""
@@ -45,6 +46,16 @@ class StreamBatchSampler(ControlNodeBase):
         print(f"[StreamBatchSampler] Input sigmas: {sigmas}")
         print(f"[StreamBatchSampler] Input noise shape: {noise.shape}, min: {noise.min():.3f}, max: {noise.max():.3f}")
         
+        # Detect if we're in text-to-image mode by checking if noise is all zeros
+        # This happens when empty latents are provided
+        self.is_txt2img_mode = torch.allclose(noise, torch.zeros_like(noise), atol=1e-6)
+        
+        if self.is_txt2img_mode:
+            print(f"[StreamBatchSampler] Detected text-to-image mode (empty latents)")
+            # For text-to-image, we'll use pure random noise
+            noise = torch.randn_like(noise)
+            print(f"[StreamBatchSampler] Generated random noise for txt2img: {noise.shape}")
+        
         # Verify batch size matches number of timesteps
         if batch_size != num_sigmas:
             raise ValueError(f"Batch size ({batch_size}) must match number of timesteps ({num_sigmas})")
@@ -57,20 +68,25 @@ class StreamBatchSampler(ControlNodeBase):
         print(f"[StreamBatchSampler] Beta values: {beta_prod_t.view(-1)}")
         
         # Initialize stock noise if needed
-        if self.stock_noise is None:
+        if self.stock_noise is None or self.is_txt2img_mode:
             self.stock_noise = torch.randn_like(noise[0])  # Random noise instead of zeros
             print(f"[StreamBatchSampler] Initialized random stock noise with shape: {self.stock_noise.shape}")
             
         # Scale noise for each frame based on its sigma
         scaled_noise = []
         for i in range(batch_size):
-            frame_noise = noise[i] + self.stock_noise * sigmas[i]  # Add scaled noise to input
+            if self.is_txt2img_mode:
+                # For txt2img, use pure noise scaled by sigma
+                frame_noise = self.stock_noise * sigmas[i]
+            else:
+                # For img2img, add scaled noise to input
+                frame_noise = noise[i] + self.stock_noise * sigmas[i]
             scaled_noise.append(frame_noise)
         x = torch.stack(scaled_noise, dim=0)
         print(f"[StreamBatchSampler] Scaled noise shape: {x.shape}, min: {x.min():.3f}, max: {x.max():.3f}")
             
         # Initialize frame buffer if needed
-        if self.x_t_latent_buffer is None and num_sigmas > 1:
+        if (self.x_t_latent_buffer is None or self.is_txt2img_mode) and num_sigmas > 1:
             self.x_t_latent_buffer = x[0].clone()  # Initialize with noised first frame
             print(f"[StreamBatchSampler] Initialized buffer with shape: {self.x_t_latent_buffer.shape}")
             
@@ -197,6 +213,7 @@ class StreamFrameBuffer(ControlNodeBase):
         super().__init__()
         self.frame_buffer = []  # List to store incoming frames
         self.buffer_size = None
+        self.is_txt2img_mode = False
         
     def update(self, latent, buffer_size=4, always_execute=True):
         """Add new frame to buffer and return batch when ready"""
@@ -204,14 +221,35 @@ class StreamFrameBuffer(ControlNodeBase):
         
         # Extract latent tensor from input and remove batch dimension if present
         x = latent["samples"]
-        if x.dim() == 4:  # [B,C,H,W]
+        
+        # Check if this is an empty latent (for txt2img)
+        is_empty_latent = x.numel() == 0 or (x.dim() > 0 and x.shape[0] == 0)
+        
+        if is_empty_latent:
+            self.is_txt2img_mode = True
+            print(f"[StreamFrameBuffer] Detected empty latent for text-to-image mode")
+            # Create empty latents with correct dimensions for txt2img
+            # Get dimensions from latent dict
+            height = latent.get("height", 512)
+            width = latent.get("width", 512)
+            
+            # Calculate latent dimensions (typically 1/8 of image dimensions for SD)
+            latent_height = height // 8
+            latent_width = width // 8
+            
+            # Create zero tensor with correct shape
+            x = torch.zeros((4, latent_height, latent_width), 
+                           device=comfy.model_management.get_torch_device())
+            print(f"[StreamFrameBuffer] Created empty latent with shape: {x.shape}")
+        elif x.dim() == 4:  # [B,C,H,W]
+            self.is_txt2img_mode = False
             x = x.squeeze(0)  # Remove batch dimension -> [C,H,W]
         
         # Add new frame to buffer
-        if len(self.frame_buffer) == 0:
-            # First frame - initialize buffer with copies
+        if len(self.frame_buffer) == 0 or self.is_txt2img_mode:
+            # First frame or txt2img mode - initialize buffer with copies
             self.frame_buffer = [x.clone() for _ in range(self.buffer_size)]
-            print(f"[StreamFrameBuffer] Initialized buffer with {self.buffer_size} copies of first frame")
+            print(f"[StreamFrameBuffer] Initialized buffer with {self.buffer_size} copies of frame")
         else:
             # Shift frames forward and add new frame
             self.frame_buffer.pop(0)  # Remove oldest frame
@@ -222,5 +260,13 @@ class StreamFrameBuffer(ControlNodeBase):
         batch = torch.stack(self.frame_buffer, dim=0)  # [B,C,H,W]
         print(f"[StreamFrameBuffer] Created batch with shape: {batch.shape}")
         
-        # Return as latent dict
-        return ({"samples": batch},)
+        # Return as latent dict with preserved dimensions
+        result = {"samples": batch}
+        
+        # Preserve height and width if present in input
+        if "height" in latent:
+            result["height"] = latent["height"]
+        if "width" in latent:
+            result["width"] = latent["width"]
+            
+        return (result,)
