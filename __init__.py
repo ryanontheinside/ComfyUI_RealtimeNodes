@@ -10,10 +10,12 @@ from .misc_nodes import(
     TextRenderer, 
     QuickShapeMask,  
     MultilineText, 
-    LoadImageFromPath_
+    LoadImageFromPath_,
+    Noop
 )
 from .media_pipe_nodes import HandTrackingNode, HandMaskNode
 from .controls.mask_controls import RepulsiveMaskNode, ResizeMaskNode
+from .particle_nodes import TemporalParticleDepthNode
 
 import re
 
@@ -38,12 +40,14 @@ NODE_CLASS_MAPPINGS = {
     "FastWebcamCapture": FastWebcamCapture,
     "MultilineText": MultilineText,
     "LoadImageFromPath_": LoadImageFromPath_,
+    "Noop": Noop,
     "HandTrackingNode": HandTrackingNode,
     "HandMaskNode": HandMaskNode,
     #"RepulsiveMaskNode": RepulsiveMaskNode,
     "ResizeMaskNode": ResizeMaskNode,
     "StateResetNode": StateResetNode,
     "StateTestNode": StateTestNode,
+    "TemporalParticleDepthNode": TemporalParticleDepthNode,
 }
 
 
