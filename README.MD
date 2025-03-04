@@ -21,6 +21,9 @@ The intention for this repository is to build a suite of nodes that can be used 
 - **IntegerMotionController**: Integer-based motion control for discrete value animations.
 - **ROINode**: Region of Interest node for motion tracking and control.
 
+### Particle Effects 🌟
+- **TemporalParticleDepthNode**: Generates a temporally consistent particle depth map with a controllable origin point. Can be linked to hand tracking for interactive particle effects.
+
 ### Utility Controls 🛠️
 - **FPSMonitor**: Generates an FPS overlay as an image and mask, useful for monitoring performance.
 - **QuickShapeMask**: Rapidly generate shape masks (circle, square) with customizable dimensions.

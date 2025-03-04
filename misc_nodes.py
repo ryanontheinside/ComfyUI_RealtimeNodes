@@ -573,3 +573,18 @@ class LoadImageFromPath_:
         
         return (image, mask)
     
+class Noop:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "any": (AlwaysEqualProxy("*"),),
+            }
+        }
+    
+    RETURN_TYPES = ()
+    FUNCTION = "noop"
+    CATEGORY = "utils"
+
+    def noop(self, any):
+        pass
