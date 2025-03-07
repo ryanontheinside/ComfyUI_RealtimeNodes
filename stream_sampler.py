@@ -37,24 +37,18 @@ class StreamBatchSampler(ControlNodeBase):
     def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
         """Sample with staggered batch denoising steps"""
         extra_args = {} if extra_args is None else extra_args
-        print(f"[StreamBatchSampler] Starting sampling with {len(sigmas)-1} steps")
         
         # Get number of frames in batch and available sigmas
         batch_size = noise.shape[0]
         num_sigmas = len(sigmas) - 1  # Subtract 1 because last sigma is the target (0.0)
-        
-        print(f"[StreamBatchSampler] Input sigmas: {sigmas}")
-        print(f"[StreamBatchSampler] Input noise shape: {noise.shape}, min: {noise.min():.3f}, max: {noise.max():.3f}")
         
         # Detect if we're in text-to-image mode by checking if noise is all zeros
         # This happens when empty latents are provided
         self.is_txt2img_mode = torch.allclose(noise, torch.zeros_like(noise), atol=1e-6)
         
         if self.is_txt2img_mode:
-            print(f"[StreamBatchSampler] Detected text-to-image mode (empty latents)")
             # For text-to-image, we'll use pure random noise
             noise = torch.randn_like(noise)
-            print(f"[StreamBatchSampler] Generated random noise for txt2img: {noise.shape}")
         
         # Verify batch size matches number of timesteps
         if batch_size != num_sigmas:
@@ -64,52 +58,41 @@ class StreamBatchSampler(ControlNodeBase):
         alpha_prod_t = (sigmas[:-1] / sigmas[0]).view(-1, 1, 1, 1)  # [B,1,1,1]
         beta_prod_t = (1 - alpha_prod_t)
         
-        print(f"[StreamBatchSampler] Alpha values: {alpha_prod_t.view(-1)}")
-        print(f"[StreamBatchSampler] Beta values: {beta_prod_t.view(-1)}")
         
         # Initialize stock noise if needed
-        if self.stock_noise is None or self.is_txt2img_mode:
+        if self.stock_noise is None or self.is_txt2img_mode:  # Kept original condition for functional equivalence
             self.stock_noise = torch.randn_like(noise[0])  # Random noise instead of zeros
-            print(f"[StreamBatchSampler] Initialized random stock noise with shape: {self.stock_noise.shape}")
-            
-        # Scale noise for each frame based on its sigma
-        scaled_noise = []
-        for i in range(batch_size):
-            if self.is_txt2img_mode:
-                # For txt2img, use pure noise scaled by sigma
-                frame_noise = self.stock_noise * sigmas[i]
-            else:
-                # For img2img, add scaled noise to input
-                frame_noise = noise[i] + self.stock_noise * sigmas[i]
-            scaled_noise.append(frame_noise)
-        x = torch.stack(scaled_noise, dim=0)
-        print(f"[StreamBatchSampler] Scaled noise shape: {x.shape}, min: {x.min():.3f}, max: {x.max():.3f}")
+        
+        # Optimization: Vectorize noise scaling instead of looping
+        sigmas_view = sigmas[:-1].view(-1, 1, 1, 1)  # Reshape for broadcasting
+        if self.is_txt2img_mode:
+            x = self.stock_noise.unsqueeze(0) * sigmas_view  # Broadcast stock_noise across batch
+        else:
+            x = noise + self.stock_noise.unsqueeze(0) * sigmas_view  # Add scaled noise to input
             
         # Initialize frame buffer if needed
-        if (self.x_t_latent_buffer is None or self.is_txt2img_mode) and num_sigmas > 1:
-            self.x_t_latent_buffer = x[0].clone()  # Initialize with noised first frame
-            print(f"[StreamBatchSampler] Initialized buffer with shape: {self.x_t_latent_buffer.shape}")
+        if (self.x_t_latent_buffer is None or self.is_txt2img_mode) and num_sigmas > 1:  # Kept original condition
+            # Optimization: Pre-allocate and copy instead of clone
+            self.x_t_latent_buffer = torch.empty_like(x[0])  # Pre-allocate memory
+            self.x_t_latent_buffer.copy_(x[0])  # In-place copy
             
         # Use buffer for first frame to maintain temporal consistency
         if num_sigmas > 1:
-            x = torch.cat([self.x_t_latent_buffer.unsqueeze(0), x[1:]], dim=0)
-            print(f"[StreamBatchSampler] Combined with buffer, shape: {x.shape}")
+            # Optimization: Update in-place instead of concatenating
+            x[0] = self.x_t_latent_buffer  # Replace first frame with buffer
             
         # Run model on entire batch at once
         with torch.no_grad():
             # Process all frames in parallel
             sigma_batch = sigmas[:-1]
-            print(f"[StreamBatchSampler] Using sigmas for denoising: {sigma_batch}")
             
             denoised_batch = model(x, sigma_batch, **extra_args)
-            print(f"[StreamBatchSampler] Denoised batch shape: {denoised_batch.shape}")
-            print(f"[StreamBatchSampler] Denoised stats - min: {denoised_batch.min():.3f}, max: {denoised_batch.max():.3f}")
             
             # Update buffer with intermediate results
             if num_sigmas > 1:
                 # Store result from first frame as buffer for next iteration
-                self.x_t_latent_buffer = denoised_batch[0].clone()
-                print(f"[StreamBatchSampler] Updated buffer with shape: {self.x_t_latent_buffer.shape}")
+                # Optimization: Use in-place copy instead of clone
+                self.x_t_latent_buffer.copy_(denoised_batch[0])  # Update buffer in-place
                 
                 # Return result from last frame
                 x_0_pred_out = denoised_batch[-1].unsqueeze(0)
@@ -211,10 +194,13 @@ class StreamFrameBuffer(ControlNodeBase):
     
     def __init__(self):
         super().__init__()
-        self.frame_buffer = []  # List to store incoming frames
+        # Optimization: Replace list with a pre-allocated tensor ring buffer
+        self.frame_buffer = None  # Tensor of shape [buffer_size, C, H, W]
         self.buffer_size = None
+        self.buffer_pos = 0  # Current position in ring buffer
+        self.is_initialized = False  # Track buffer initialization
         self.is_txt2img_mode = False
-        
+    
     def update(self, latent, buffer_size=4, always_execute=True):
         """Add new frame to buffer and return batch when ready"""
         self.buffer_size = buffer_size
@@ -245,19 +231,29 @@ class StreamFrameBuffer(ControlNodeBase):
             self.is_txt2img_mode = False
             x = x.squeeze(0)  # Remove batch dimension -> [C,H,W]
         
-        # Add new frame to buffer
-        if len(self.frame_buffer) == 0 or self.is_txt2img_mode:
-            # First frame or txt2img mode - initialize buffer with copies
-            self.frame_buffer = [x.clone() for _ in range(self.buffer_size)]
-            print(f"[StreamFrameBuffer] Initialized buffer with {self.buffer_size} copies of frame")
+        # Optimization: Initialize or resize frame_buffer as a tensor
+        if not self.is_initialized or self.frame_buffer.shape[0] != self.buffer_size or \
+           self.frame_buffer.shape[1:] != x.shape:
+            # Pre-allocate buffer with correct shape
+            self.frame_buffer = torch.zeros(
+                (self.buffer_size, *x.shape),
+                device=x.device,
+                dtype=x.dtype
+            )
+            if self.is_txt2img_mode or not self.is_initialized:
+                # Optimization: Use broadcasting to fill buffer with copies
+                self.frame_buffer[:] = x.unsqueeze(0)  # Broadcast x to [buffer_size, C, H, W]
+                print(f"[StreamFrameBuffer] Initialized buffer with {self.buffer_size} copies of frame")
+            self.is_initialized = True
+            self.buffer_pos = 0
         else:
-            # Shift frames forward and add new frame
-            self.frame_buffer.pop(0)  # Remove oldest frame
-            self.frame_buffer.append(x.clone())  # Add new frame
-            print(f"[StreamFrameBuffer] Added new frame to buffer")
-            
-        # Stack frames into batch
-        batch = torch.stack(self.frame_buffer, dim=0)  # [B,C,H,W]
+            # Add new frame to buffer using ring buffer logic
+            self.frame_buffer[self.buffer_pos] = x  # In-place update
+            print(f"[StreamFrameBuffer] Added new frame to buffer at position {self.buffer_pos}")
+            self.buffer_pos = (self.buffer_pos + 1) % self.buffer_size  # Circular increment
+        
+        # Optimization: frame_buffer is already a tensor batch, no need to stack
+        batch = self.frame_buffer
         print(f"[StreamFrameBuffer] Created batch with shape: {batch.shape}")
         
         # Return as latent dict with preserved dimensions
