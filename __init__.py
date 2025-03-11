@@ -7,6 +7,7 @@ from .stream_diffusion_nodes import StreamCrossAttention
 from .stream_sampler import  StreamBatchSampler, StreamScheduler, StreamFrameBuffer
 from .stream_cfg import StreamCFG
 from .stream_conditioning import StreamConditioning
+from .particle_nodes import DepthMapWarpNode
 import re
 
 
@@ -16,7 +17,7 @@ NODE_CLASS_MAPPINGS = {
     "IntControl": IntControl,
     "StringControl": StringControl,
     "FloatSequence": FloatSequence,
-    "IntSequence": IntSequence,
+    "IntSequence": IntSequence, 
     "StringSequence": StringSequence,
     "FPSMonitor": FPSMonitor,
     "SimilarityFilter": SimilarityFilter,
@@ -31,7 +32,7 @@ NODE_CLASS_MAPPINGS = {
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
-
+    "DepthMapWarpNode": DepthMapWarpNode,
 
     "ROINode": ROINode,
 
