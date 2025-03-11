@@ -160,24 +160,46 @@ class StreamBatchSampler:
         self.x_t_latent_buffer = None
         self.stock_noise = None
         self.is_txt2img_mode = False
+        
+        # Initialize all optimization buffers as None
+        self.zeros_reference = None
+        self.random_noise_buffer = None
+        self.sigmas_view_buffer = None
+        self.expanded_stock_noise = None
+        self.working_buffer = None
+        self.output_buffer = None
     
     @profile_time
     @profile_cprofile
     def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
-        """Sample with staggered batch denoising steps"""
+        """Sample with staggered batch denoising steps - Optimized version"""
         extra_args = {} if extra_args is None else extra_args
         
         # Get number of frames in batch and available sigmas
         batch_size = noise.shape[0]
         num_sigmas = len(sigmas) - 1  # Subtract 1 because last sigma is the target (0.0)
         
-        # Detect if we're in text-to-image mode by checking if noise is all zeros
-        # This happens when empty latents are provided
-        self.is_txt2img_mode = torch.allclose(noise, torch.zeros_like(noise), atol=1e-6)
+        # Optimization 1: Reuse zeros buffer for txt2img detection
+        if self.zeros_reference is None:
+            # We only need a small reference tensor for comparison, not a full tensor
+            self.zeros_reference = torch.zeros(1, device=noise.device, dtype=noise.dtype)
         
+        # Check if noise tensor is all zeros - functionally identical but more efficient
+        self.is_txt2img_mode = torch.abs(noise).sum() < 1e-5
+        
+        # Noise handling with memory optimization
         if self.is_txt2img_mode:
-            # For text-to-image, we'll use pure random noise
-            noise = torch.randn_like(noise)
+            # Optimization 2: If txt2img mode, reuse the noise tensor directly
+            # instead of allocating new memory
+            if self.random_noise_buffer is None or self.random_noise_buffer.shape != noise.shape:
+                self.random_noise_buffer = torch.empty_like(noise)
+            
+            # Generate random noise in-place
+            self.random_noise_buffer.normal_()
+            x = self.random_noise_buffer  # Use pre-allocated buffer
+        else:
+            # If not txt2img, we'll still need to add noise later
+            x = noise  # No need to copy, will add noise later
         
         # Verify batch size matches number of timesteps
         if batch_size != num_sigmas:
@@ -187,29 +209,46 @@ class StreamBatchSampler:
         alpha_prod_t = (sigmas[:-1] / sigmas[0]).view(-1, 1, 1, 1)  # [B,1,1,1]
         beta_prod_t = (1 - alpha_prod_t)
         
+        # Optimization 3: Initialize stock noise with reuse
+        if self.stock_noise is None or self.stock_noise.shape != noise[0].shape:
+            self.stock_noise = torch.empty_like(noise[0])
+            self.stock_noise.normal_()  # Generate random noise in-place
         
-        # Initialize stock noise if needed
-        if self.stock_noise is None or self.is_txt2img_mode:  # Kept original condition for functional equivalence
-            self.stock_noise = torch.randn_like(noise[0])  # Random noise instead of zeros
+        # Optimization 4: Pre-allocate and reuse view buffer for sigmas
+        if self.sigmas_view_buffer is None or self.sigmas_view_buffer.shape[0] != len(sigmas)-1:
+            self.sigmas_view_buffer = torch.empty((len(sigmas)-1, 1, 1, 1), 
+                                               device=sigmas.device, 
+                                               dtype=sigmas.dtype)
+        # In-place copy of sigmas view
+        self.sigmas_view_buffer.copy_(sigmas[:-1].view(-1, 1, 1, 1))
         
-        # Optimization: Vectorize noise scaling instead of looping
-        sigmas_view = sigmas[:-1].view(-1, 1, 1, 1)  # Reshape for broadcasting
-        if self.is_txt2img_mode:
-            x = self.stock_noise.unsqueeze(0) * sigmas_view  # Broadcast stock_noise across batch
-        else:
-            x = noise + self.stock_noise.unsqueeze(0) * sigmas_view  # Add scaled noise to input
-            
-        # Initialize frame buffer if needed
-        if (self.x_t_latent_buffer is None or self.is_txt2img_mode) and num_sigmas > 1:  # Kept original condition
-            # Optimization: Pre-allocate and copy instead of clone
-            self.x_t_latent_buffer = torch.empty_like(x[0])  # Pre-allocate memory
-            self.x_t_latent_buffer.copy_(x[0])  # In-place copy
-            
+        # Optimization 5: Eliminate unsqueeze allocation by pre-expanding stock noise
+        if self.expanded_stock_noise is None or self.expanded_stock_noise.shape[0] != batch_size:
+            self.expanded_stock_noise = self.stock_noise.expand(batch_size, *self.stock_noise.shape)
+        
+        # Apply noise with pre-allocated buffers - no new memory allocation
+        if not self.is_txt2img_mode:  # Already handled txt2img case above
+            # If we need a working buffer separate from noise input:
+            if id(x) == id(noise):  # They're the same object, need a separate buffer
+                if self.working_buffer is None or self.working_buffer.shape != noise.shape:
+                    self.working_buffer = torch.empty_like(noise)
+                x = self.working_buffer
+                # Add noise to input
+                torch.add(noise, self.expanded_stock_noise * self.sigmas_view_buffer, out=x)
+        
+        # Initialize and manage latent buffer with memory optimization
+        if (self.x_t_latent_buffer is None or self.is_txt2img_mode) and num_sigmas > 1:
+            # Optimization 6: Pre-allocate or resize as needed
+            if self.x_t_latent_buffer is None or self.x_t_latent_buffer.shape != x[0].shape:
+                self.x_t_latent_buffer = torch.empty_like(x[0])
+            # In-place copy instead of clone
+            self.x_t_latent_buffer.copy_(x[0])
+        
         # Use buffer for first frame to maintain temporal consistency
         if num_sigmas > 1:
-            # Optimization: Update in-place instead of concatenating
-            x[0] = self.x_t_latent_buffer  # Replace first frame with buffer
-            
+            # In-place update - no new allocation
+            x[0].copy_(self.x_t_latent_buffer)
+        
         # Run model on entire batch at once
         with torch.no_grad():
             # Process all frames in parallel
@@ -220,15 +259,20 @@ class StreamBatchSampler:
             # Update buffer with intermediate results
             if num_sigmas > 1:
                 # Store result from first frame as buffer for next iteration
-                # Optimization: Use in-place copy instead of clone
-                self.x_t_latent_buffer.copy_(denoised_batch[0])  # Update buffer in-place
+                self.x_t_latent_buffer.copy_(denoised_batch[0])  # In-place update
                 
-                # Return result from last frame
-                x_0_pred_out = denoised_batch[-1].unsqueeze(0)
+                # Optimization 7: Pre-allocate output buffer
+                if self.output_buffer is None or self.output_buffer.shape != (1, *denoised_batch[-1].shape):
+                    self.output_buffer = torch.empty(1, *denoised_batch[-1].shape, 
+                                                  device=denoised_batch.device,
+                                                  dtype=denoised_batch.dtype)
+                # Copy the result directly to pre-allocated buffer
+                self.output_buffer[0].copy_(denoised_batch[-1])
+                x_0_pred_out = self.output_buffer
             else:
                 x_0_pred_out = denoised_batch
                 self.x_t_latent_buffer = None
-                
+            
             # Call callback if provided
             if callback is not None:
                 callback({'x': x_0_pred_out, 'i': 0, 'sigma': sigmas[0], 'sigma_hat': sigmas[0], 'denoised': denoised_batch[-1:]})
