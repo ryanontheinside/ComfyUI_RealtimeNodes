@@ -1,39 +1,168 @@
 import torch
-from .base.control_base import ControlNodeBase
 import comfy.model_management
 import comfy.samplers
 import random
+import time
+import os
+import json
+from datetime import datetime
+from functools import wraps
+import cProfile
+import pstats
+import io
+
+# Simple profiling setup - SINGLE FILE
+PROFILE_FILE = "stream_sampler_profile.json"
+PROFILE_DATA = []
+
+def profile_time(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Start timing
+        start_time = time.time()
+        
+        # Check memory before
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            mem_before = torch.cuda.memory_allocated() / (1024 * 1024)
+        
+        # Execute the function
+        result = func(*args, **kwargs)
+        
+        # End timing
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        end_time = time.time()
+        
+        # Check memory after
+        if torch.cuda.is_available():
+            mem_after = torch.cuda.memory_allocated() / (1024 * 1024)
+            mem_diff = mem_after - mem_before
+        else:
+            mem_diff = 0
+        
+        exec_time = end_time - start_time
+        
+        # Get shape info if available
+        shape_info = "unknown"
+        if len(args) > 1 and hasattr(args[1], 'shape'):  # If this is sample(), args[1] is noise
+            shape_info = str(args[1].shape)
+        
+        # Log results
+        entry = {
+            'function': func.__name__,
+            'execution_time': exec_time,
+            'memory_diff_mb': mem_diff,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'shape': shape_info
+        }
+        
+        PROFILE_DATA.append(entry)
+        
+        # Print to console
+        print(f"PROFILE: {func.__name__} - Time: {exec_time:.4f}s, Memory: {mem_diff:.2f}MB")
+        
+        # Save to file after each run
+        save_profile_data()
+            
+        return result
+    return wrapper
 
 
-class StreamBatchSampler(ControlNodeBase):
-    """Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps"""
+def profile_cprofile(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Create profiler
+        pr = cProfile.Profile()
+        pr.enable()
+        
+        # Execute the function
+        result = func(*args, **kwargs)
+        
+        # Disable profiler
+        pr.disable()
+        
+        # Get stats
+        s = io.StringIO()
+        ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+        ps.print_stats(20)
+        
+        # Add to the most recent profile entry
+        if PROFILE_DATA:
+            PROFILE_DATA[-1]['cprofile_data'] = s.getvalue()
+        
+        return result
+    return wrapper
+
+
+def save_profile_data():
+    """Save all profiling data to a single JSON file"""
+    if not PROFILE_DATA:
+        return
+    
+    # Convert to serializable format
+    json_data = []
+    for entry in PROFILE_DATA:
+        serializable_entry = {
+            'function': entry['function'],
+            'execution_time': float(entry['execution_time']),
+            'memory_diff_mb': float(entry['memory_diff_mb']),
+            'timestamp': entry['timestamp'],
+            'shape': entry.get('shape', 'unknown')
+        }
+        
+        if 'cprofile_data' in entry:
+            # Only store recent cprofile data to keep file size manageable
+            if len(json_data) < 10 or len(json_data) % 10 == 0:
+                serializable_entry['cprofile_data'] = entry['cprofile_data']
+        
+        json_data.append(serializable_entry)
+    
+    # Write to a single file
+    with open(PROFILE_FILE, 'w') as f:
+        json.dump(json_data, f, indent=2)
+    
+    # Calculate stats
+    sample_times = [x['execution_time'] for x in PROFILE_DATA if x['function'] == 'sample']
+    if sample_times:
+        avg_time = sum(sample_times) / len(sample_times)
+        min_time = min(sample_times)
+        max_time = max(sample_times)
+        print(f"PROFILE SUMMARY: {len(sample_times)} runs, Avg: {avg_time:.4f}s, Min: {min_time:.4f}s, Max: {max_time:.4f}s")
+    
+    print(f"Profiling data saved to {PROFILE_FILE}")
+
+
+class StreamBatchSampler:
+    
     
     RETURN_TYPES = ("SAMPLER",)
     FUNCTION = "update"
-    CATEGORY = "real-time/sampling"
-    
+    CATEGORY = "StreamPack/sampling"
+    DESCRIPTION = "Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps. Also adds temportal consistency to the denoising process."
     @classmethod
     def INPUT_TYPES(cls):
-        inputs = super().INPUT_TYPES()
-        inputs["required"].update({
-            "num_steps": ("INT", {
-                "default": 4,
-                "min": 1,
-                "max": 10,
-                "step": 1,
-                "tooltip": "Number of denoising steps. Should match the frame buffer size."
-            }),
-        })
-        return inputs
+        return {
+            "required": {
+                "num_steps": ("INT", {
+                    "default": 4,
+                    "min": 1,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "Number of denoising steps. Should match the frame buffer size."
+                }),
+            },
+        }
     
     def __init__(self):
-        super().__init__()
         self.num_steps = None
         self.frame_buffer = []
         self.x_t_latent_buffer = None
         self.stock_noise = None
         self.is_txt2img_mode = False
     
+    @profile_time
+    @profile_cprofile
     def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
         """Sample with staggered batch denoising steps"""
         extra_args = {} if extra_args is None else extra_args
@@ -106,40 +235,43 @@ class StreamBatchSampler(ControlNodeBase):
         
         return x_0_pred_out
     
-    def update(self, num_steps=4, always_execute=True):
+    @profile_time
+    def update(self, num_steps=4):
         """Create sampler with specified settings"""
         self.num_steps = num_steps
         sampler = comfy.samplers.KSAMPLER(self.sample)
         return (sampler,)
 
+# Print setup info when module is imported
+print(f"StreamBatchSampler profiling enabled. Results will be saved to {PROFILE_FILE}")
 
-class StreamScheduler(ControlNodeBase):
-    """Implements StreamDiffusion's efficient timestep selection"""
+
+class StreamScheduler:
     
     RETURN_TYPES = ("SIGMAS",)
     FUNCTION = "update"
-    CATEGORY = "real-time/sampling"
-
+    CATEGORY = "StreamPack/sampling"
+    DESCRIPTION = "Implements StreamDiffusion's efficient timestep selection. Use in conjunction with StreamBatchSampler."
     @classmethod
     def INPUT_TYPES(cls):
-        inputs = super().INPUT_TYPES()
-        inputs["required"].update({
-            "model": ("MODEL",),
-            "t_index_list": ("STRING", {
-                "default": "32,45",
-                "tooltip": "Comma-separated list of timesteps to actually use for denoising. Examples: '32,45' for img2img or '0,16,32,45' for txt2img"
-            }),
-            "num_inference_steps": ("INT", {
-                "default": 50,
-                "min": 1,
-                "max": 1000,
-                "step": 1,
-                "tooltip": "Total number of timesteps in schedule. StreamDiffusion uses 50 by default. Only timesteps specified in t_index_list are actually used."
-            }),
-        })
-        return inputs
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "t_index_list": ("STRING", {
+                    "default": "32,45",
+                    "tooltip": "Comma-separated list of timesteps to actually use for denoising. Examples: '32,45' for img2img or '0,16,32,45' for txt2img"
+                }),
+                "num_inference_steps": ("INT", {
+                    "default": 50,
+                    "min": 1,
+                    "max": 1000,
+                    "step": 1,
+                    "tooltip": "Total number of timesteps in schedule. StreamDiffusion uses 50 by default. Only timesteps specified in t_index_list are actually used."
+                }),
+            },
+        }
 
-    def update(self, model, t_index_list="32,45", num_inference_steps=50, always_execute=True):
+    def update(self, model, t_index_list="32,45", num_inference_steps=50):
         # Get model's sampling parameters
         model_sampling = model.get_model_object("model_sampling")
         
@@ -170,38 +302,36 @@ class StreamScheduler(ControlNodeBase):
         return (selected_sigmas,)
 
 
-class StreamFrameBuffer(ControlNodeBase):
-    """Accumulates frames to enable staggered batch denoising like StreamDiffusion"""
+class StreamFrameBuffer:
+    
     
     RETURN_TYPES = ("LATENT",)
     FUNCTION = "update"
-    CATEGORY = "real-time/sampling"
-    
+    CATEGORY = "StreamPack/sampling"
+    DESCRIPTION = "Accumulates frames to enable staggered batch denoising like StreamDiffusion. Use in conjunction with StreamBatchSampler"
     @classmethod
     def INPUT_TYPES(cls):
-        inputs = super().INPUT_TYPES()
-        inputs["required"].update({
-            "latent": ("LATENT",),
-            "buffer_size": ("INT", {
-                "default": 4,
-                "min": 1,
-                "max": 10,
-                "step": 1,
-                "tooltip": "Number of frames to buffer before starting batch processing. Should match number of denoising steps."
-            }),
-        })
-        return inputs
+        return {
+            "required": {
+                "latent": ("LATENT",),
+                "buffer_size": ("INT", {
+                    "default": 4,
+                    "min": 1,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "Number of frames to buffer before starting batch processing. Should match number of denoising steps."
+                }),
+            },
+        }
     
     def __init__(self):
-        super().__init__()
-        # Optimization: Replace list with a pre-allocated tensor ring buffer
         self.frame_buffer = None  # Tensor of shape [buffer_size, C, H, W]
         self.buffer_size = None
         self.buffer_pos = 0  # Current position in ring buffer
         self.is_initialized = False  # Track buffer initialization
         self.is_txt2img_mode = False
     
-    def update(self, latent, buffer_size=4, always_execute=True):
+    def update(self, latent, buffer_size=4):
         """Add new frame to buffer and return batch when ready"""
         self.buffer_size = buffer_size
         
