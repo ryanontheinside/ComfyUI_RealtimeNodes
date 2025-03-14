@@ -1,17 +1,9 @@
 import torch
 import comfy.model_management
 import comfy.samplers
-import random
-import time
-import os
 
 class StreamBatchSampler:
     
-    
-    RETURN_TYPES = ("SAMPLER",)
-    FUNCTION = "update"
-    CATEGORY = "StreamPack/sampling"
-    DESCRIPTION = "Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps. Also adds temportal consistency to the denoising process."
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -26,6 +18,11 @@ class StreamBatchSampler:
             },
         }
     
+    RETURN_TYPES = ("SAMPLER",)
+    FUNCTION = "update"
+    CATEGORY = "StreamPack/sampling"
+    DESCRIPTION = "Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps. Also adds temportal consistency to the denoising process."
+    
     def __init__(self):
         self.num_steps = None
         self.frame_buffer = []
@@ -33,7 +30,7 @@ class StreamBatchSampler:
         self.stock_noise = None
         self.is_txt2img_mode = False
         
-        # Initialize all optimization buffers as None
+        # Initialize all buffers
         self.zeros_reference = None
         self.random_noise_buffer = None
         self.sigmas_view_buffer = None
@@ -49,18 +46,16 @@ class StreamBatchSampler:
         batch_size = noise.shape[0]
         num_sigmas = len(sigmas) - 1  # Subtract 1 because last sigma is the target (0.0)
         
-        # Optimization 1: Reuse zeros buffer for txt2img detection
+        
+        # Reuse zeros buffer for txt2img detection
         if self.zeros_reference is None:
-            # We only need a small reference tensor for comparison, not a full tensor
             self.zeros_reference = torch.zeros(1, device=noise.device, dtype=noise.dtype)
         
-        # Check if noise tensor is all zeros - functionally identical but more efficient
+        # Check if noise tensor is all zeros
         self.is_txt2img_mode = torch.abs(noise).sum() < 1e-5
         
-        # Noise handling with memory optimization
         if self.is_txt2img_mode:
-            # Optimization 2: If txt2img mode, reuse the noise tensor directly
-            # instead of allocating new memory
+            # If txt2img mode, reuse the noise tensor directly
             if self.random_noise_buffer is None or self.random_noise_buffer.shape != noise.shape:
                 self.random_noise_buffer = torch.empty_like(noise)
             
@@ -69,7 +64,7 @@ class StreamBatchSampler:
             x = self.random_noise_buffer  # Use pre-allocated buffer
         else:
             # If not txt2img, we'll still need to add noise later
-            x = noise  # No need to copy, will add noise later
+            x = noise
         
         # Verify batch size matches number of timesteps
         if batch_size != num_sigmas:
@@ -79,12 +74,12 @@ class StreamBatchSampler:
         alpha_prod_t = (sigmas[:-1] / sigmas[0]).view(-1, 1, 1, 1)  # [B,1,1,1]
         beta_prod_t = (1 - alpha_prod_t)
         
-        # Optimization 3: Initialize stock noise with reuse
+        # Initialize stock noise with reuse
         if self.stock_noise is None or self.stock_noise.shape != noise[0].shape:
             self.stock_noise = torch.empty_like(noise[0])
             self.stock_noise.normal_()  # Generate random noise in-place
         
-        # Optimization 4: Pre-allocate and reuse view buffer for sigmas
+        # Pre-allocate and reuse view buffer for sigmas
         if self.sigmas_view_buffer is None or self.sigmas_view_buffer.shape[0] != len(sigmas)-1:
             self.sigmas_view_buffer = torch.empty((len(sigmas)-1, 1, 1, 1), 
                                                device=sigmas.device, 
@@ -92,7 +87,7 @@ class StreamBatchSampler:
         # In-place copy of sigmas view
         self.sigmas_view_buffer.copy_(sigmas[:-1].view(-1, 1, 1, 1))
         
-        # Optimization 5: Eliminate unsqueeze allocation by pre-expanding stock noise
+        # Eliminate unsqueeze allocation by pre-expanding stock noise
         if self.expanded_stock_noise is None or self.expanded_stock_noise.shape[0] != batch_size:
             self.expanded_stock_noise = self.stock_noise.expand(batch_size, *self.stock_noise.shape)
         
@@ -108,18 +103,15 @@ class StreamBatchSampler:
         
         # Initialize and manage latent buffer with memory optimization
         if (self.x_t_latent_buffer is None or self.is_txt2img_mode) and num_sigmas > 1:
-            # Optimization 6: Pre-allocate or resize as needed
+            # Pre-allocate or resize as needed
             if self.x_t_latent_buffer is None or self.x_t_latent_buffer.shape != x[0].shape:
                 self.x_t_latent_buffer = torch.empty_like(x[0])
-            # In-place copy instead of clone
             self.x_t_latent_buffer.copy_(x[0])
         
         # Use buffer for first frame to maintain temporal consistency
         if num_sigmas > 1:
-            # In-place update - no new allocation
             x[0].copy_(self.x_t_latent_buffer)
         
-        # Run model on entire batch at once
         with torch.no_grad():
             # Process all frames in parallel
             sigma_batch = sigmas[:-1]
@@ -131,7 +123,7 @@ class StreamBatchSampler:
                 # Store result from first frame as buffer for next iteration
                 self.x_t_latent_buffer.copy_(denoised_batch[0])  # In-place update
                 
-                # Optimization 7: Pre-allocate output buffer
+                # Pre-allocate output buffer
                 if self.output_buffer is None or self.output_buffer.shape != (1, *denoised_batch[-1].shape):
                     self.output_buffer = torch.empty(1, *denoised_batch[-1].shape, 
                                                   device=denoised_batch.device,
@@ -158,17 +150,13 @@ class StreamBatchSampler:
 
 class StreamScheduler:
     
-    RETURN_TYPES = ("SIGMAS",)
-    FUNCTION = "update"
-    CATEGORY = "StreamPack/sampling"
-    DESCRIPTION = "Implements StreamDiffusion's efficient timestep selection. Use in conjunction with StreamBatchSampler."
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "model": ("MODEL",),
                 "t_index_list": ("STRING", {
-                    "default": "32,45",
+                    "default": "0,16,32,49",
                     "tooltip": "Comma-separated list of timesteps to actually use for denoising. Examples: '32,45' for img2img or '0,16,32,45' for txt2img"
                 }),
                 "num_inference_steps": ("INT", {
@@ -181,6 +169,11 @@ class StreamScheduler:
             },
         }
 
+    RETURN_TYPES = ("SIGMAS",)
+    FUNCTION = "update"
+    CATEGORY = "StreamPack/sampling"
+    DESCRIPTION = "Implements StreamDiffusion's efficient timestep selection. Use in conjunction with StreamBatchSampler."
+    
     def update(self, model, t_index_list="32,45", num_inference_steps=50):
         # Get model's sampling parameters
         model_sampling = model.get_model_object("model_sampling")
@@ -214,11 +207,6 @@ class StreamScheduler:
 
 class StreamFrameBuffer:
     
-    
-    RETURN_TYPES = ("LATENT",)
-    FUNCTION = "update"
-    CATEGORY = "StreamPack/sampling"
-    DESCRIPTION = "Accumulates frames to enable staggered batch denoising like StreamDiffusion. Use in conjunction with StreamBatchSampler"
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -234,12 +222,20 @@ class StreamFrameBuffer:
             },
         }
     
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "update"
+    CATEGORY = "StreamPack/sampling"
+    DESCRIPTION = "Accumulates frames to enable staggered batch denoising like StreamDiffusion. Use in conjunction with StreamBatchSampler"
+    
+    
     def __init__(self):
         self.frame_buffer = None  # Tensor of shape [buffer_size, C, H, W]
         self.buffer_size = None
-        self.buffer_pos = 0  # Current position in ring buffer
+        self.buffer_pos = 0  # Current position
         self.is_initialized = False  # Track buffer initialization
         self.is_txt2img_mode = False
+        self.last_valid_frame = None  # Store the last valid frame as fallback
+        self.expected_shape = None  # Store expected shape for validation
     
     def update(self, latent, buffer_size=4):
         """Add new frame to buffer and return batch when ready"""
@@ -248,46 +244,48 @@ class StreamFrameBuffer:
         # Extract latent tensor from input and remove batch dimension if present
         x = latent["samples"]
         
-        # Check if this is an empty latent (for txt2img)
-        is_empty_latent = x.numel() == 0 or (x.dim() > 0 and x.shape[0] == 0)
+        # Check if this is a txt2img (zeros tensor) or img2img mode
+        # In ComfyUI, EmptyLatentImage returns a zeros tensor with shape [batch_size, 4, h//8, w//8]
+        # We consider it txt2img mode if the tensor contains all zeros
+        is_txt2img_mode = torch.sum(torch.abs(x)) < 1e-6
+        self.is_txt2img_mode = is_txt2img_mode
         
-        if is_empty_latent:
-            self.is_txt2img_mode = True
-
-            # Create empty latents with correct dimensions for txt2img
-            # Get dimensions from latent dict
-            height = latent.get("height", 512)
-            width = latent.get("width", 512)
-            
-            # Calculate latent dimensions (typically 1/8 of image dimensions for SD)
-            latent_height = height // 8
-            latent_width = width // 8
-            
-            # Create zero tensor with correct shape
-            x = torch.zeros((4, latent_height, latent_width), 
-                           device=comfy.model_management.get_torch_device())
-
-        elif x.dim() == 4:  # [B,C,H,W]
-            self.is_txt2img_mode = False
+        # If it's a batch with size 1, remove the batch dimension for our buffer
+        if x.dim() == 4 and x.shape[0] == 1:  # [1,C,H,W]
             x = x.squeeze(0)  # Remove batch dimension -> [C,H,W]
         
-        # Optimization: Initialize or resize frame_buffer as a tensor
-        if not self.is_initialized or self.frame_buffer.shape[0] != self.buffer_size or \
-           self.frame_buffer.shape[1:] != x.shape:
+        # Initialize buffer on first run or when buffer size changes
+        if not self.is_initialized or self.frame_buffer is None or self.frame_buffer.shape[0] != self.buffer_size:
+            # First initialization - set expected shape and store first frame
+            if not self.is_initialized:
+                self.expected_shape = x.shape
+                self.last_valid_frame = x.clone()
+            
             # Pre-allocate buffer with correct shape
             self.frame_buffer = torch.zeros(
-                (self.buffer_size, *x.shape),
+                (self.buffer_size, *self.expected_shape),
                 device=x.device,
                 dtype=x.dtype
             )
+            
             if self.is_txt2img_mode or not self.is_initialized:
+                # Use the right-sized frame for initialization
+                init_frame = x if x.shape == self.expected_shape else self.last_valid_frame
                 # Optimization: Use broadcasting to fill buffer with copies
-                self.frame_buffer[:] = x.unsqueeze(0)  # Broadcast x to [buffer_size, C, H, W]
+                self.frame_buffer[:] = init_frame.unsqueeze(0)  # Broadcast to [buffer_size, C, H, W]
 
             self.is_initialized = True
             self.buffer_pos = 0
         else:
-            # Add new frame to buffer using ring buffer logic
+            # Check if incoming frame matches expected dimensions
+            if x.shape != self.expected_shape:
+                # Size mismatch - use last valid frame instead
+                x = self.last_valid_frame
+            else:
+                # Valid frame - update our reference
+                self.last_valid_frame = x.clone()
+            
+            # Add frame to buffer using ring buffer logic
             self.frame_buffer[self.buffer_pos] = x  # In-place update
             self.buffer_pos = (self.buffer_pos + 1) % self.buffer_size  # Circular increment
         
