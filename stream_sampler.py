@@ -9,62 +9,88 @@ class StreamBatchSampler(ControlNodeBase):
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
-        inputs["required"].update({
-            "latent": ("LATENT",),
-            "num_timesteps": ("INT", {
-                "default": 2,
-                "min": 1,
-                "max": 10,
-                "step": 1,
-                "tooltip": "Number of denoising steps to use. More steps = better quality but MUCH slower. StreamDiffusion's speed comes from using just 2 steps for img2img (32,45) or 4 for txt2img (0,16,32,45)"
-            }),
-            "frame_buffer_size": ("INT", {
-                "default": 1,
-                "min": 1,
-                "max": 10,
-                "step": 1,
-                "tooltip": "How many frames to process together for temporal consistency. Each frame is processed at each timestep (total batch = frame_buffer_size * num_timesteps). Higher values reduce flickering but use more VRAM and don't improve speed"
-            }),
-            "cfg_type": (["none", "full", "self", "initialize"], {
-                "default": "self",
-                "tooltip": "'self' is fastest and most memory efficient, 'full' is standard SD behavior but slower, 'initialize' is a middle ground, 'none' disables guidance"
-            }),
-            "delta": ("FLOAT", {
-                "default": 1.0,
-                "min": 0.0,
-                "max": 5.0,
-                "step": 0.1,
-                "tooltip": "Only used with 'self' CFG. Controls strength of self-guidance. Higher values = stronger guidance but more artifacts. Default 1.0 works well"
-            }),
-            "similarity_threshold": ("FLOAT", {
-                "default": 0.98,
-                "min": 0.0,
-                "max": 1.0,
-                "step": 0.01,
-                "tooltip": "Skip frames that are too similar to save compute. 0 = process all frames. Try 0.98 if you want to skip static scenes. Higher = more skipping"
-                #TODO: see if this is backwards from original
-            }),
-            "max_skip_frames": ("INT", {
-                "default": 10,
-                "min": 1,
-                "max": 100,
-                "step": 1,
-                "tooltip": "Maximum frames to skip when using similarity filter. Prevents getting stuck on static scenes. Lower = more responsive to changes"
-            }),
-        })
+        inputs["required"].update(
+            {
+                "latent": ("LATENT",),
+                "num_timesteps": (
+                    "INT",
+                    {
+                        "default": 2,
+                        "min": 1,
+                        "max": 10,
+                        "step": 1,
+                        "tooltip": "Number of denoising steps to use. More steps = better quality but MUCH slower. StreamDiffusion's speed comes from using just 2 steps for img2img (32,45) or 4 for txt2img (0,16,32,45)",
+                    },
+                ),
+                "frame_buffer_size": (
+                    "INT",
+                    {
+                        "default": 1,
+                        "min": 1,
+                        "max": 10,
+                        "step": 1,
+                        "tooltip": "How many frames to process together for temporal consistency. Each frame is processed at each timestep (total batch = frame_buffer_size * num_timesteps). Higher values reduce flickering but use more VRAM and don't improve speed",
+                    },
+                ),
+                "cfg_type": (
+                    ["none", "full", "self", "initialize"],
+                    {
+                        "default": "self",
+                        "tooltip": "'self' is fastest and most memory efficient, 'full' is standard SD behavior but slower, 'initialize' is a middle ground, 'none' disables guidance",
+                    },
+                ),
+                "delta": (
+                    "FLOAT",
+                    {
+                        "default": 1.0,
+                        "min": 0.0,
+                        "max": 5.0,
+                        "step": 0.1,
+                        "tooltip": "Only used with 'self' CFG. Controls strength of self-guidance. Higher values = stronger guidance but more artifacts. Default 1.0 works well",
+                    },
+                ),
+                "similarity_threshold": (
+                    "FLOAT",
+                    {
+                        "default": 0.98,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.01,
+                        "tooltip": "Skip frames that are too similar to save compute. 0 = process all frames. Try 0.98 if you want to skip static scenes. Higher = more skipping",
+                        # TODO: see if this is backwards from original
+                    },
+                ),
+                "max_skip_frames": (
+                    "INT",
+                    {
+                        "default": 10,
+                        "min": 1,
+                        "max": 100,
+                        "step": 1,
+                        "tooltip": "Maximum frames to skip when using similarity filter. Prevents getting stuck on static scenes. Lower = more responsive to changes",
+                    },
+                ),
+            }
+        )
         inputs["optional"] = {
-            "prompt": ("STRING", {
-                "multiline": True,
-                "default": "",
-                "tooltip": "Optional text prompt. Enables KV caching for faster processing. Leave empty to disable. Same prompt across frames = faster"
-            }),
+            "prompt": (
+                "STRING",
+                {
+                    "multiline": True,
+                    "default": "",
+                    "tooltip": "Optional text prompt. Enables KV caching for faster processing. Leave empty to disable. Same prompt across frames = faster",
+                },
+            ),
         }
         return inputs
 
-    RETURN_TYPES = ("SAMPLER", "LATENT",)
+    RETURN_TYPES = (
+        "SAMPLER",
+        "LATENT",
+    )
     FUNCTION = "update"
     CATEGORY = "real-time/sampling"
-    DESCRIPTION="Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps (StreamDiffusion)"
+    DESCRIPTION = "Implements batched denoising for faster inference by processing multiple frames in parallel at different denoising steps (StreamDiffusion)"
 
     def __init__(self):
         super().__init__()
@@ -108,16 +134,19 @@ class StreamBatchSampler(ControlNodeBase):
             return None
 
         if cache_key not in self.cached_noise:
-            self.cached_noise[cache_key] = self.stock_noise.unsqueeze(0).expand(batch_size, -1, -1, -1) * scale
+            self.cached_noise[cache_key] = (
+                self.stock_noise.unsqueeze(0).expand(batch_size, -1, -1, -1) * scale
+            )
             if self.debug:
-                print(f"[StreamBatchSampler] Cached expanded noise for batch_size={batch_size}, scale={scale}")
+                print(
+                    f"[StreamBatchSampler] Cached expanded noise for batch_size={batch_size}, scale={scale}"
+                )
 
         return self.cached_noise[cache_key]
 
     def invalidate_noise_cache(self):
         """Clear all cached noise when stock noise changes"""
         self.cached_noise.clear()
-
 
     def process_with_cfg(self, model, x, sigma_batch, extra_args):
         """Apply classifier-free guidance based on current cfg_type"""
@@ -137,7 +166,9 @@ class StreamBatchSampler(ControlNodeBase):
             model_output = model(x_double, sigma_double, **extra_args)
             noise_pred_uncond, noise_pred_text = model_output.chunk(2)
             # Combine predictions
-            eps_cfg = noise_pred_uncond + cond_scale * (noise_pred_text - noise_pred_uncond)
+            eps_cfg = noise_pred_uncond + cond_scale * (
+                noise_pred_text - noise_pred_uncond
+            )
             return eps_cfg
 
         elif self.cfg_type == "initialize":
@@ -152,7 +183,7 @@ class StreamBatchSampler(ControlNodeBase):
             # Update stock noise with uncond prediction
             self.stock_noise = noise_pred_uncond[0].clone()
             self.invalidate_noise_cache()
-            return noise_pred_text # Returning noise_pred_text as per original logic
+            return noise_pred_text  # Returning noise_pred_text as per original logic
 
         else:  # self
             if self.debug:
@@ -162,7 +193,9 @@ class StreamBatchSampler(ControlNodeBase):
             # Get current model prediction
             eps_c = model(x, sigma_batch, **extra_args)
             if self.debug:
-                print(f"[CFG] Current prediction (eps_c) stats: min={eps_c.min():.3f}, max={eps_c.max():.3f}, mean={eps_c.mean():.3f}")
+                print(
+                    f"[CFG] Current prediction (eps_c) stats: min={eps_c.min():.3f}, max={eps_c.max():.3f}, mean={eps_c.mean():.3f}"
+                )
 
             # Initialize stock noise if needed
             if self.stock_noise is None:
@@ -176,15 +209,23 @@ class StreamBatchSampler(ControlNodeBase):
             noise_pred_uncond = self.stock_noise.to(eps_c.device) * self.delta
             if self.debug:
                 print(f"[CFG] Using delta={self.delta}, cond_scale={cond_scale}")
-                print(f"[CFG] Stock noise stats: min={self.stock_noise.min():.3f}, max={self.stock_noise.max():.3f}, mean={self.stock_noise.mean():.3f}")
-                print(f"[CFG] Uncond prediction stats: min={noise_pred_uncond.min():.3f}, max={noise_pred_uncond.max():.3f}, mean={noise_pred_uncond.mean():.3f}")
+                print(
+                    f"[CFG] Stock noise stats: min={self.stock_noise.min():.3f}, max={self.stock_noise.max():.3f}, mean={self.stock_noise.mean():.3f}"
+                )
+                print(
+                    f"[CFG] Uncond prediction stats: min={noise_pred_uncond.min():.3f}, max={noise_pred_uncond.max():.3f}, mean={noise_pred_uncond.mean():.3f}"
+                )
 
             # Combine predictions exactly as StreamDiffusion does
             eps_cfg = noise_pred_uncond + cond_scale * (eps_c - noise_pred_uncond)
 
             if self.debug:
-                print(f"[CFG] Final output (eps_cfg) stats: min={eps_cfg.min():.3f}, max={eps_cfg.max():.3f}, mean={eps_cfg.mean():.3f}")
-                print(f"[CFG] Difference (eps_cfg - eps_c) stats: min={(eps_cfg-eps_c).min():.3f}, max={(eps_cfg-eps_c).max():.3f}, mean={(eps_cfg-eps_c).mean():.3f}\n")
+                print(
+                    f"[CFG] Final output (eps_cfg) stats: min={eps_cfg.min():.3f}, max={eps_cfg.max():.3f}, mean={eps_cfg.mean():.3f}"
+                )
+                print(
+                    f"[CFG] Difference (eps_cfg - eps_c) stats: min={(eps_cfg-eps_c).min():.3f}, max={(eps_cfg-eps_c).max():.3f}, mean={(eps_cfg-eps_c).mean():.3f}\n"
+                )
 
             return eps_cfg
 
@@ -220,6 +261,7 @@ class StreamBatchSampler(ControlNodeBase):
 
             # Use ComfyUI's optimized attention
             from comfy.ldm.modules.attention import optimized_attention
+
             out = optimized_attention(q, k, v, module.heads, mask=mask)
             return module.to_out[0](out)
 
@@ -240,13 +282,19 @@ class StreamBatchSampler(ControlNodeBase):
                 if isinstance(module, torch.nn.Module) and hasattr(module, "to_q"):
                     if not hasattr(module, "_original_forward"):
                         module._original_forward = module.forward
-                    module.forward = lambda *args, **kwargs: optimized_attention_forward(module, *args, **kwargs)
+                    module.forward = (
+                        lambda *args, **kwargs: optimized_attention_forward(
+                            module, *args, **kwargs
+                        )
+                    )
                 return output
 
             # Register hooks on cross attention blocks
             def register_hooks(module):
                 if isinstance(module, torch.nn.Module) and hasattr(module, "to_q"):
-                    self.cross_attention_hook = module.register_forward_hook(create_cross_attn_patch)
+                    self.cross_attention_hook = module.register_forward_hook(
+                        create_cross_attn_patch
+                    )
 
             unet.apply(register_hooks)
             self.last_prompt = prompt
@@ -260,9 +308,9 @@ class StreamBatchSampler(ControlNodeBase):
 
         if self.similarity_filter is None:
             from .controls.similar_image_filter import SimilarImageFilter
+
             self.similarity_filter = SimilarImageFilter(
-                threshold=self.similarity_threshold,
-                max_skip_frame=self.max_skip_frames
+                threshold=self.similarity_threshold, max_skip_frame=self.max_skip_frames
             )
         filtered_out = self.similarity_filter(x_0_pred_out)
         if filtered_out is not None:
@@ -276,14 +324,20 @@ class StreamBatchSampler(ControlNodeBase):
         print(f"\n[Alpha/Beta] Input sigmas: {sigmas}")
 
         num_train_timesteps = 1000  # Standard for many diffusion models
-        timesteps = torch.linspace(1, 0, num_train_timesteps, dtype=torch.float32, device=sigmas.device)
+        timesteps = torch.linspace(
+            1, 0, num_train_timesteps, dtype=torch.float32, device=sigmas.device
+        )
         alphas_cumprod = torch.cos((timesteps + 0.008) / 1.008 * math.pi / 2).pow(2)
         alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
 
         # Map sigmas to timesteps
-        scaled_sigmas = sigmas / sigmas.max() if sigmas.max() > 0 else torch.zeros_like(sigmas)
+        scaled_sigmas = (
+            sigmas / sigmas.max() if sigmas.max() > 0 else torch.zeros_like(sigmas)
+        )
         timesteps_for_sigma = (1 - scaled_sigmas) * (num_train_timesteps - 1)
-        indices = torch.round(timesteps_for_sigma).long().clamp(0, num_train_timesteps - 1)
+        indices = (
+            torch.round(timesteps_for_sigma).long().clamp(0, num_train_timesteps - 1)
+        )
 
         alpha_prod_t = alphas_cumprod[indices].view(-1, 1, 1, 1)
         beta_prod_t = 1 - alpha_prod_t
@@ -294,34 +348,56 @@ class StreamBatchSampler(ControlNodeBase):
         self.beta_prod_t_sqrt = torch.sqrt(beta_prod_t)
 
         print(f"[Alpha/Beta] Final stats:")
-        print(f"  alpha_prod_t: min={self.alpha_prod_t.min():.4f}, max={self.alpha_prod_t.max():.4f}, mean={self.alpha_prod_t.mean():.4f}")
-        print(f"  beta_prod_t: min={self.beta_prod_t.min():.4f}, max={self.beta_prod_t.max():.4f}, mean={self.beta_prod_t.mean():.4f}")
-        print(f"  alpha_sqrt: min={self.alpha_prod_t_sqrt.min():.4f}, max={self.alpha_prod_t_sqrt.max():.4f}, mean={self.alpha_prod_t_sqrt.mean():.4f}")
-        print(f"  beta_sqrt: min={self.beta_prod_t_sqrt.min():.4f}, max={self.beta_prod_t_sqrt.max():.4f}, mean={self.beta_prod_t_sqrt.mean():.4f}\n")
+        print(
+            f"  alpha_prod_t: min={self.alpha_prod_t.min():.4f}, max={self.alpha_prod_t.max():.4f}, mean={self.alpha_prod_t.mean():.4f}"
+        )
+        print(
+            f"  beta_prod_t: min={self.beta_prod_t.min():.4f}, max={self.beta_prod_t.max():.4f}, mean={self.beta_prod_t.mean():.4f}"
+        )
+        print(
+            f"  alpha_sqrt: min={self.alpha_prod_t_sqrt.min():.4f}, max={self.alpha_prod_t_sqrt.max():.4f}, mean={self.alpha_prod_t_sqrt.mean():.4f}"
+        )
+        print(
+            f"  beta_sqrt: min={self.beta_prod_t_sqrt.min():.4f}, max={self.beta_prod_t_sqrt.max():.4f}, mean={self.beta_prod_t_sqrt.mean():.4f}\n"
+        )
 
     def scheduler_step_batch(self, denoised_batch, scaled_noise):
         """Compute scheduler step for the entire batch (LCM-like)"""
         print("\n[Scheduler] Starting scheduler step (LCM-like):")
         print(f"  Denoised shape: {denoised_batch.shape}")
         print(f"  Scaled noise shape: {scaled_noise.shape}")
-        print(f"  Denoised stats: min={denoised_batch.min():.4f}, max={denoised_batch.max():.4f}, mean={denoised_batch.mean():.4f}")
-        print(f"  Scaled noise stats: min={scaled_noise.min():.4f}, max={scaled_noise.max():.4f}, mean={scaled_noise.mean():.4f}")
+        print(
+            f"  Denoised stats: min={denoised_batch.min():.4f}, max={denoised_batch.max():.4f}, mean={denoised_batch.mean():.4f}"
+        )
+        print(
+            f"  Scaled noise stats: min={scaled_noise.min():.4f}, max={scaled_noise.max():.4f}, mean={scaled_noise.mean():.4f}"
+        )
 
         # Assuming self.alpha_prod_t and self.beta_prod_t are for the current timestep
-        alpha_t_sqrt = self.alpha_prod_t_sqrt[:denoised_batch.shape[0]]
-        beta_t_sqrt = self.beta_prod_t_sqrt[:denoised_batch.shape[0]]
+        alpha_t_sqrt = self.alpha_prod_t_sqrt[: denoised_batch.shape[0]]
+        beta_t_sqrt = self.beta_prod_t_sqrt[: denoised_batch.shape[0]]
 
         # Calculate the predicted original sample (x_0) from the noisy sample and model output
         # This is similar to the inverse of the forward diffusion step
-        pred_original_sample = (denoised_batch - beta_t_sqrt.view(-1, 1, 1, 1) * scaled_noise) / (alpha_t_sqrt.view(-1, 1, 1, 1) + 1e-7)
-        print(f"  Predicted original sample stats: min={pred_original_sample.min():.4f}, max={pred_original_sample.max():.4f}, mean={pred_original_sample.mean():.4f}")
+        pred_original_sample = (
+            denoised_batch - beta_t_sqrt.view(-1, 1, 1, 1) * scaled_noise
+        ) / (alpha_t_sqrt.view(-1, 1, 1, 1) + 1e-7)
+        print(
+            f"  Predicted original sample stats: min={pred_original_sample.min():.4f}, max={pred_original_sample.max():.4f}, mean={pred_original_sample.mean():.4f}"
+        )
 
         # For the reverse step, we need the alpha and beta for the previous timestep
         # Since we are operating on a batch of timesteps, we'll use the values corresponding to the first timestep in the batch for updating stock_noise
         # In StreamDiffusion paper, the update happens based on the result of the last denoising step
 
         # Get alpha and beta for the next step: (which would be the previous in the denoising sequence)
-        alpha_next_sqrt = torch.cat([self.alpha_prod_t_sqrt[1:denoised_batch.shape[0]], torch.ones_like(self.alpha_prod_t_sqrt[0:1])], dim=0)
+        alpha_next_sqrt = torch.cat(
+            [
+                self.alpha_prod_t_sqrt[1 : denoised_batch.shape[0]],
+                torch.ones_like(self.alpha_prod_t_sqrt[0:1]),
+            ],
+            dim=0,
+        )
 
         # Calculate the coefficient for the predicted original sample in the next step
         sigma_next = (1 - alpha_next_sqrt.pow(2)) / (alpha_next_sqrt + 1e-7)
@@ -333,11 +409,15 @@ class StreamBatchSampler(ControlNodeBase):
         # Calculate delta_x (the change in the noisy sample)
         delta_x = (sigma_next - sigma_t) * guidance_scale * pred_original_sample
 
-        print(f"  Final delta_x stats: min={delta_x.min():.4f}, max={delta_x.max():.4f}, mean={delta_x.mean():.4f}\n")
+        print(
+            f"  Final delta_x stats: min={delta_x.min():.4f}, max={delta_x.max():.4f}, mean={delta_x.mean():.4f}\n"
+        )
 
         return delta_x
 
-    def sample(self, model, noise, sigmas, extra_args=None, callback=None, disable=None):
+    def sample(
+        self, model, noise, sigmas, extra_args=None, callback=None, disable=None
+    ):
         """Sample with staggered batch denoising steps"""
         extra_args = {} if extra_args is None else extra_args
 
@@ -356,7 +436,9 @@ class StreamBatchSampler(ControlNodeBase):
         # Calculate total batch size based on frame_buffer_size and number of timesteps
         total_batch_size = self.frame_buffer_size * self.num_timesteps
         if batch_size != total_batch_size:
-            raise ValueError(f"Batch size ({batch_size}) must match frame_buffer_size * num_timesteps ({total_batch_size})")
+            raise ValueError(
+                f"Batch size ({batch_size}) must match frame_buffer_size * num_timesteps ({total_batch_size})"
+            )
 
         # Pre-compute alpha and beta terms if not already computed or if sigmas changed
         if self.cached_sigmas is None or not torch.equal(self.cached_sigmas, sigmas):
@@ -368,17 +450,25 @@ class StreamBatchSampler(ControlNodeBase):
             self.stock_noise = self.init_noise[0].clone()
         else:
             # Shift noise sequence
-            self.stock_noise = torch.cat([self.init_noise[1:], self.init_noise[0:1]], dim=0)[0]
+            self.stock_noise = torch.cat(
+                [self.init_noise[1:], self.init_noise[0:1]], dim=0
+            )[0]
 
-        print(f"  Stock noise stats: min={self.stock_noise.min():.4f}, max={self.stock_noise.max():.4f}, mean={self.stock_noise.mean():.4f}")
+        print(
+            f"  Stock noise stats: min={self.stock_noise.min():.4f}, max={self.stock_noise.max():.4f}, mean={self.stock_noise.mean():.4f}"
+        )
 
         # Scale noise for each frame based on its sigma - vectorized with caching
         sigma_scaled_noise = self.get_expanded_noise(batch_size)
         print(f"  Expanded noise shape: {sigma_scaled_noise.shape}")
-        print(f"  Expanded noise stats: min={sigma_scaled_noise.min():.4f}, max={sigma_scaled_noise.max():.4f}, mean={sigma_scaled_noise.mean():.4f}")
+        print(
+            f"  Expanded noise stats: min={sigma_scaled_noise.min():.4f}, max={sigma_scaled_noise.max():.4f}, mean={sigma_scaled_noise.mean():.4f}"
+        )
 
-        x = noise + sigma_scaled_noise * sigmas[:self.num_timesteps].view(-1, 1, 1, 1)
-        print(f"  Initial x stats: min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+        x = noise + sigma_scaled_noise * sigmas[: self.num_timesteps].view(-1, 1, 1, 1)
+        print(
+            f"  Initial x stats: min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}"
+        )
 
         # Initialize frame buffer if needed
         if self.x_t_latent_buffer is None and self.num_timesteps > 1:
@@ -388,76 +478,116 @@ class StreamBatchSampler(ControlNodeBase):
         # Use buffer for first frame to maintain temporal consistency
         if self.num_timesteps > 1:
             x = torch.cat([self.x_t_latent_buffer.unsqueeze(0), x[1:]], dim=0)
-            print(f"  After buffer concat x stats: min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}")
+            print(
+                f"  After buffer concat x stats: min={x.min():.4f}, max={x.max():.4f}, mean={x.mean():.4f}"
+            )
 
         # Run model on entire batch at once
         with torch.no_grad():
             # Process all frames in parallel
-            sigma_batch = sigmas[:self.num_timesteps]
+            sigma_batch = sigmas[: self.num_timesteps]
             # Process with CFG handling inside process_with_cfg
             denoised_batch = self.process_with_cfg(model, x, sigma_batch, extra_args)
             print(f"\n[Sample] After denoising:")
             print(f"  Denoised shape: {denoised_batch.shape}")
-            print(f"  Denoised stats: min={denoised_batch.min():.4f}, max={denoised_batch.max():.4f}, mean={denoised_batch.mean():.4f}")
+            print(
+                f"  Denoised stats: min={denoised_batch.min():.4f}, max={denoised_batch.max():.4f}, mean={denoised_batch.mean():.4f}"
+            )
 
             # Update buffer with intermediate results
             if self.num_timesteps > 1:
                 # Store result from first frame as buffer for next iteration
                 self.x_t_latent_buffer = denoised_batch[0].clone()
-                print(f"  Updated buffer stats: min={self.x_t_latent_buffer.min():.4f}, max={self.x_t_latent_buffer.max():.4f}, mean={self.x_t_latent_buffer.mean():.4f}")
+                print(
+                    f"  Updated buffer stats: min={self.x_t_latent_buffer.min():.4f}, max={self.x_t_latent_buffer.max():.4f}, mean={self.x_t_latent_buffer.mean():.4f}"
+                )
                 # Return result from last frame
                 x_0_pred_out = denoised_batch[-1].unsqueeze(0)
             else:
                 x_0_pred_out = denoised_batch
                 self.x_t_latent_buffer = None
 
-            print(f"  Output pred stats: min={x_0_pred_out.min():.4f}, max={x_0_pred_out.max():.4f}, mean={x_0_pred_out.mean():.4f}")
+            print(
+                f"  Output pred stats: min={x_0_pred_out.min():.4f}, max={x_0_pred_out.max():.4f}, mean={x_0_pred_out.mean():.4f}"
+            )
 
             # Apply similarity filter if enabled
             x_0_pred_out = self.apply_similarity_filter(x_0_pred_out)
 
             # Call callback if provided
             if callback is not None:
-                callback({'x': x_0_pred_out, 'i': 0, 'sigma': sigmas[0], 'sigma_hat': sigmas[0], 'denoised': x_0_pred_out})
+                callback(
+                    {
+                        "x": x_0_pred_out,
+                        "i": 0,
+                        "sigma": sigmas[0],
+                        "sigma_hat": sigmas[0],
+                        "denoised": x_0_pred_out,
+                    }
+                )
 
             # Update stock noise using scheduler steps
             if self.cfg_type == "self":
                 print("\n[Sample] Updating stock noise:")
                 # Scale noise properly
-                scaled_noise = self.beta_prod_t_sqrt[:denoised_batch.shape[0]].view(-1, 1, 1, 1) * self.stock_noise
-                print(f"  Scaled noise stats: min={scaled_noise.min():.4f}, max={scaled_noise.max():.4f}, mean={scaled_noise.mean():.4f}")
+                scaled_noise = (
+                    self.beta_prod_t_sqrt[: denoised_batch.shape[0]].view(-1, 1, 1, 1)
+                    * self.stock_noise
+                )
+                print(
+                    f"  Scaled noise stats: min={scaled_noise.min():.4f}, max={scaled_noise.max():.4f}, mean={scaled_noise.mean():.4f}"
+                )
 
                 # Get delta_x using scheduler step
                 delta_x = self.scheduler_step_batch(denoised_batch, scaled_noise)
-                print(f"  Initial delta_x stats: min={delta_x.min():.4f}, max={delta_x.max():.4f}, mean={delta_x.mean():.4f}")
+                print(
+                    f"  Initial delta_x stats: min={delta_x.min():.4f}, max={delta_x.max():.4f}, mean={delta_x.mean():.4f}"
+                )
 
                 # Prepare next step's alpha/beta terms
-                alpha_next = torch.cat([
-                    self.alpha_prod_t_sqrt[1:denoised_batch.shape[0]],
-                    torch.ones_like(self.alpha_prod_t_sqrt[0:1])
-                ], dim=0)
-                beta_next = torch.cat([
-                    self.beta_prod_t_sqrt[1:denoised_batch.shape[0]],
-                    torch.zeros_like(self.beta_prod_t_sqrt[0:1])
-                ], dim=0)
+                alpha_next = torch.cat(
+                    [
+                        self.alpha_prod_t_sqrt[1 : denoised_batch.shape[0]],
+                        torch.ones_like(self.alpha_prod_t_sqrt[0:1]),
+                    ],
+                    dim=0,
+                )
+                beta_next = torch.cat(
+                    [
+                        self.beta_prod_t_sqrt[1 : denoised_batch.shape[0]],
+                        torch.zeros_like(self.beta_prod_t_sqrt[0:1]),
+                    ],
+                    dim=0,
+                )
 
-                print(f"  Alpha next stats: min={alpha_next.min():.4f}, max={alpha_next.max():.4f}, mean={alpha_next.mean():.4f}")
-                print(f"  Beta next stats: min={beta_next.min():.4f}, max={beta_next.max():.4f}, mean={beta_next.mean():.4f}")
+                print(
+                    f"  Alpha next stats: min={alpha_next.min():.4f}, max={alpha_next.max():.4f}, mean={alpha_next.mean():.4f}"
+                )
+                print(
+                    f"  Beta next stats: min={beta_next.min():.4f}, max={beta_next.max():.4f}, mean={beta_next.mean():.4f}"
+                )
 
                 # Update noise prediction
-                delta_x = (alpha_next.view(-1, 1, 1, 1) * delta_x) / (beta_next.view(-1, 1, 1, 1) + 1e-7)
-                print(f"  Scaled delta_x stats: min={delta_x.min():.4f}, max={delta_x.max():.4f}, mean={delta_x.mean():.4f}")
+                delta_x = (alpha_next.view(-1, 1, 1, 1) * delta_x) / (
+                    beta_next.view(-1, 1, 1, 1) + 1e-7
+                )
+                print(
+                    f"  Scaled delta_x stats: min={delta_x.min():.4f}, max={delta_x.max():.4f}, mean={delta_x.mean():.4f}"
+                )
 
                 # Use noise sequence for init_noise
-                init_noise = torch.cat([
-                    self.init_noise[1:],
-                    self.init_noise[0:1]
-                ], dim=0)
-                print(f"  Init noise stats: min={init_noise.min():.4f}, max={init_noise.max():.4f}, mean={init_noise.mean():.4f}")
+                init_noise = torch.cat(
+                    [self.init_noise[1:], self.init_noise[0:1]], dim=0
+                )
+                print(
+                    f"  Init noise stats: min={init_noise.min():.4f}, max={init_noise.max():.4f}, mean={init_noise.mean():.4f}"
+                )
 
                 # Update stock noise with proper scaling
                 self.stock_noise = init_noise[0] + delta_x[0]
-                print(f"  Final stock noise stats: min={self.stock_noise.min():.4f}, max={self.stock_noise.max():.4f}, mean={self.stock_noise.mean():.4f}\n")
+                print(
+                    f"  Final stock noise stats: min={self.stock_noise.min():.4f}, max={self.stock_noise.max():.4f}, mean={self.stock_noise.mean():.4f}\n"
+                )
 
             # Update step counter
             self.step_counter += 1
@@ -475,11 +605,18 @@ class StreamBatchSampler(ControlNodeBase):
             x = x.squeeze(0)  # Remove batch dimension -> [C,H,W]
 
         # Initialize or resize frame buffer if needed
-        if self.frame_buffer is None or self.frame_buffer.shape[0] != self.frame_buffer_size:
+        if (
+            self.frame_buffer is None
+            or self.frame_buffer.shape[0] != self.frame_buffer_size
+        ):
             # Pre-allocate tensor buffer
-            self.frame_buffer = torch.zeros((self.frame_buffer_size,) + x.shape, dtype=x.dtype, device=x.device)
+            self.frame_buffer = torch.zeros(
+                (self.frame_buffer_size,) + x.shape, dtype=x.dtype, device=x.device
+            )
             if self.debug:
-                print(f"[StreamFrameBuffer] Pre-allocated tensor buffer for {self.frame_buffer_size} frames")
+                print(
+                    f"[StreamFrameBuffer] Pre-allocated tensor buffer for {self.frame_buffer_size} frames"
+                )
 
         # Rotate frames and add new frame using tensor operations
         if self.frame_buffer_size > 1:
@@ -487,13 +624,25 @@ class StreamBatchSampler(ControlNodeBase):
         self.frame_buffer[-1] = x
 
         # Create batch by repeating frames for each timestep
-        batch = self.frame_buffer.repeat_interleave(self.num_timesteps, dim=0)  # [buffer_size*num_timesteps,C,H,W]
+        batch = self.frame_buffer.repeat_interleave(
+            self.num_timesteps, dim=0
+        )  # [buffer_size*num_timesteps,C,H,W]
 
         # Return as latent dict
         return {"samples": batch}
 
-    def update(self, latent, num_timesteps, frame_buffer_size=1, cfg_type="self", delta=1.0, prompt="",
-               similarity_threshold=0.0, max_skip_frames=10, always_execute=True):
+    def update(
+        self,
+        latent,
+        num_timesteps,
+        frame_buffer_size=1,
+        cfg_type="self",
+        delta=1.0,
+        prompt="",
+        similarity_threshold=0.0,
+        max_skip_frames=10,
+        always_execute=True,
+    ):
         """Create sampler with specified settings and process frame"""
         self.frame_buffer_size = frame_buffer_size
         self.cfg_type = cfg_type
@@ -523,7 +672,7 @@ class StreamBatchSampler(ControlNodeBase):
             self.init_noise = torch.randn(
                 (num_timesteps, 4, self.latent_height, self.latent_width),
                 device=comfy.model_management.get_torch_device(),
-                dtype=latent["samples"].dtype
+                dtype=latent["samples"].dtype,
             )
 
             # Initialize stock noise as zeros like StreamDiffusion
@@ -552,20 +701,28 @@ class StreamScheduler(ControlNodeBase):
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
-        inputs["required"].update({
-            "model": ("MODEL",),
-            "t_index_list": ("STRING", {
-                "default": "32,45",
-                "tooltip": "Comma-separated list of timesteps to actually use for denoising. For LCM: use '32,45' for img2img or '0,16,32,45' for txt2img. For SDXL Turbo: use '45,49' for 2 steps or '49' for 1 step (Turbo works best with steps near the end of denoising)"
-            }),
-            "num_inference_steps": ("INT", {
-                "default": 50,
-                "min": 1,
-                "max": 1000,
-                "step": 1,
-                "tooltip": "Total number of timesteps in schedule. StreamDiffusion uses 50 by default. Only timesteps specified in t_index_list are actually used."
-            }),
-        })
+        inputs["required"].update(
+            {
+                "model": ("MODEL",),
+                "t_index_list": (
+                    "STRING",
+                    {
+                        "default": "32,45",
+                        "tooltip": "Comma-separated list of timesteps to actually use for denoising. For LCM: use '32,45' for img2img or '0,16,32,45' for txt2img. For SDXL Turbo: use '45,49' for 2 steps or '49' for 1 step (Turbo works best with steps near the end of denoising)",
+                    },
+                ),
+                "num_inference_steps": (
+                    "INT",
+                    {
+                        "default": 50,
+                        "min": 1,
+                        "max": 1000,
+                        "step": 1,
+                        "tooltip": "Total number of timesteps in schedule. StreamDiffusion uses 50 by default. Only timesteps specified in t_index_list are actually used.",
+                    },
+                ),
+            }
+        )
         return inputs
 
     def parse_timesteps(self, t_index_list):
@@ -575,7 +732,9 @@ class StreamScheduler(ControlNodeBase):
 
         try:
             # Parse and sort in reverse order once
-            indices = sorted([int(t.strip()) for t in t_index_list.split(",")], reverse=True)
+            indices = sorted(
+                [int(t.strip()) for t in t_index_list.split(",")], reverse=True
+            )
             self.last_t_index_list = t_index_list
             self.cached_indices = indices
             return indices
@@ -585,7 +744,9 @@ class StreamScheduler(ControlNodeBase):
             self.cached_indices = [45, 32]  # Already sorted in reverse
             return self.cached_indices
 
-    def update(self, model, t_index_list="32,45", num_inference_steps=50, always_execute=True):
+    def update(
+        self, model, t_index_list="32,45", num_inference_steps=50, always_execute=True
+    ):
         # Get model's sampling parameters
         model_sampling = model.get_model_object("model_sampling")
 
@@ -593,13 +754,17 @@ class StreamScheduler(ControlNodeBase):
         t_indices = self.parse_timesteps(t_index_list)
 
         # Create full schedule using normal scheduler
-        full_sigmas = comfy.samplers.normal_scheduler(model_sampling, num_inference_steps)
+        full_sigmas = comfy.samplers.normal_scheduler(
+            model_sampling, num_inference_steps
+        )
 
         # Select only the sigmas at our desired indices
         selected_sigmas = []
         for t in t_indices:
             if t < 0 or t >= num_inference_steps:
-                print(f"Warning: timestep {t} out of range [0,{num_inference_steps}), skipping")
+                print(
+                    f"Warning: timestep {t} out of range [0,{num_inference_steps}), skipping"
+                )
                 continue
             selected_sigmas.append(float(full_sigmas[t]))
 
@@ -608,5 +773,7 @@ class StreamScheduler(ControlNodeBase):
 
         # Create tensor directly on target device
         device = comfy.model_management.get_torch_device()
-        selected_sigmas = torch.tensor(selected_sigmas, dtype=torch.float32, device=device)
+        selected_sigmas = torch.tensor(
+            selected_sigmas, dtype=torch.float32, device=device
+        )
         return (selected_sigmas,)
