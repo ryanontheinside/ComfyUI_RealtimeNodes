@@ -6,6 +6,7 @@ from .misc_nodes import DTypeConverter, FastWebcamCapture, YOLOSimilarityCompare
 from .stream_sampler import  StreamBatchSampler, StreamScheduler
 from .stream_cfg import StreamCFG
 from .stream_conditioning import StreamConditioning
+from .particle_nodes import DepthMapWarpNode
 import re
 
 
@@ -28,8 +29,7 @@ NODE_CLASS_MAPPINGS = {
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
-
-
+    "DepthMapWarpNode": DepthMapWarpNode,
     "ROINode": ROINode,
 
     #"IntervalControl": IntervalCo  ntrol,
