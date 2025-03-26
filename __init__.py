@@ -8,7 +8,7 @@ from .stream_cfg import StreamCFG
 from .stream_conditioning import StreamConditioning
 from .particle_nodes import DepthMapWarpNode
 import re
-
+from .image_enhance import UnsharpMask
 
 
 NODE_CLASS_MAPPINGS = {
@@ -39,6 +39,7 @@ NODE_CLASS_MAPPINGS = {
     "FastWebcamCapture": FastWebcamCapture,
     "MultilineText": MultilineText,
     "LoadImageFromPath_": LoadImageFromPath_,
+    "UnsharpMask": UnsharpMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {}
