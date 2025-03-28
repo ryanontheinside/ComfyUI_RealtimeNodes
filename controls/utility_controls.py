@@ -266,6 +266,3 @@ class LazyCondition(ControlNodeBase):
                 return (fallback,)
             else:
                 return (state["prev_output"],)
-
-
-
