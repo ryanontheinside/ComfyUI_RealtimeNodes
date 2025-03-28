@@ -3,15 +3,18 @@ from .controls.sequence_controls import FloatSequence, IntSequence, StringSequen
 from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
 from .controls.state_management_controls import StateResetNode, StateTestNode
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
-from .misc_nodes import( 
-    DTypeConverter, 
-    FastWebcamCapture, 
-    YOLOSimilarityCompare, 
-    TextRenderer, 
-    QuickShapeMask,  
-    MultilineText, 
+from .misc_nodes import (
+    DTypeConverter,
+    FastWebcamCapture,
+    YOLOSimilarityCompare,
+    TextRenderer,
+    QuickShapeMask,
+    MultilineText,
     LoadImageFromPath_
 )
+from .stream_sampler import  StreamBatchSampler, StreamScheduler
+from .stream_cfg import StreamCFG
+from .stream_conditioning import StreamConditioning
 from .media_pipe_nodes import HandTrackingNode, HandMaskNode
 from .controls.mask_controls import RepulsiveMaskNode, ResizeMaskNode
 
@@ -27,12 +30,21 @@ NODE_CLASS_MAPPINGS = {
     "StringSequence": StringSequence,
     "FPSMonitor": FPSMonitor,
     "SimilarityFilter": SimilarityFilter,
+    "StreamCFG": StreamCFG,
+    "StreamConditioning": StreamConditioning,
+    "StreamBatchSampler": StreamBatchSampler,
+    "StreamScheduler": StreamScheduler,
     "LazyCondition": LazyCondition,
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
     "TextRenderer": TextRenderer,
+
+
     "ROINode": ROINode,
+
+    #"IntervalControl": IntervalCo  ntrol,
+    #"DeltaControl": DeltaControl,
     "QuickShapeMask": QuickShapeMask,
     "DTypeConverter": DTypeConverter,
     "FastWebcamCapture": FastWebcamCapture,
