@@ -1,3 +1,4 @@
-opencv-python
-Pillow
-mediapipe
+mediapipe>=0.10.9
+opencv-python>=4.7.0
+numpy>=1.20.0
+scipy>=1.8.0 
