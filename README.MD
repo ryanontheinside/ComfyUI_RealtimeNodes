@@ -1,146 +1,170 @@
-# ComfyUI Real-Time Nodes ⏱️
+#staged  for integration
 
-A growing suite of nodes for real-time ComfyUI workflows. Features include value animation, motion detection and tracking, sequence control, and more. These nodes update their outputs on each workflow execution, making them perfect for real-time applications like [ComfyStream](https://github.com/yondonfu/comfystream) that execute the workflow once per frame. 
 
-The intention for this repository is to build a suite of nodes that can be used in the burgeoning real-time diffusion space. Contributions are welcome!
+## ✨ Overview
 
-## Nodes
+This repository aims to provide a complete and centralized implementation of all MediaPipe vision tasks, optimized for real-time use in ComfyUI.
 
-### Value Controls 🎚️
-- **FloatControl**: Outputs a floating point value that changes over time using various patterns (sine wave, bounce, random walk, etc).
-- **IntControl**: Same as FloatControl but outputs integer values.
-- **StringControl**: Cycles through a list of strings using the same movement patterns.
+These tools can be used for interactive AI art, responsive interfaces, motion tracking, advanced masking workflows, and more. These are well optimizede for real-time usage (with comfystream), but are blazing fast for normal batch processing as well.
 
-### Sequence Controls 📽️
-- **FloatSequence**: Cycles through a comma-separated list of float values.
-- **IntSequence**: Cycles through a comma-separated list of integer values.
-- **StringSequence**: Cycles through a list of strings (one per line).
+## 🚀 Features
 
-### Motion Controls 🎮
-- **MotionController**: Advanced float-based motion control for smooth animations.
-- **IntegerMotionController**: Integer-based motion control for discrete value animations.
-- **ROINode**: Region of Interest node for motion tracking and control.
+| Category | Available Tools |
+|----------|-------------|
+| **Face Analysis** | Face detection, face mesh (478 points), blendshapes, head pose |
+| **Body Tracking** | Pose estimation (33 landmarks), segmentation masks |
+| **Hand Analysis** | Hand tracking (21 landmarks per hand), gesture recognition |
+| **Image Processing** | Object detection, image segmentation, image embeddings |
+| **Creative Tools** | Face stylization, interactive segmentation |
+| **Control Nodes** | Use deltas from tracking landmarks to control other Comfy nodes |
 
-### Utility Controls 🛠️
-- **FPSMonitor**: Generates an FPS overlay as an image and mask, useful for monitoring performance.
-- **QuickShapeMask**: Rapidly generate shape masks (circle, square) with customizable dimensions.
-- **DTypeConverter**: Convert masks between different data types (float16, uint8, float32, float64).
-- **FastWebcamCapture**: High-performance webcam capture node with resizing capabilities.
-- **SimilarityFilter**: Filter out similar consecutive images and control downstream execution. Perfect for optimizing real-time workflows by skipping redundant processing of similar frames.
-- **LazyCondition**: Powerful conditional execution node that supports any input type. Uses lazy evaluation to truly skip execution of unused paths and maintains state to avoid feedback loops.
+## 📋 Supported MediaPipe Tasks
 
-## Movement Patterns 🔄
+* **Face Detection:** Face bounding boxes and keypoints
+* **Face Landmark Detection:** Face mesh landmarks with optional expression analysis
+* **Hand Landmark Detection:** Hand position tracking with 21 landmarks
+* **Pose Landmark Detection:** Body pose tracking with 33 landmarks
+* **Object Detection:** Common object detection using models like EfficientDet
+* **Image Segmentation:** Category-based image segmentation
+* **Gesture Recognition:** Recognition of common hand gestures
+* **Image Embedding:** Feature vector generation for image similarity
+* **Interactive Segmentation:** User-guided image masking
+* **Face Stylization:** Artistic style application to faces
+* **Holistic Landmark Detection:** Full-body landmark detection (legacy)
 
-All value and motion controls support various movement patterns:
-- **Sine**: Smooth sinusoidal motion
-- **Triangle**: Linear interpolation with smooth direction changes
-- **Sawtooth**: Linear interpolation with sharp resets
-- **Square**: Instant transitions between min/max values
-- **Static**: No movement (constant value)
-- **and more**
+> **Note:** Holistic landmark detection is currently using legacy API as we await official Tasks API release.
 
-## Usage 📖
 
-### Value Controls
-Connect any value control node to the input of the node you want to animate. These nodes use movement patterns like sine, bounce, etc. to smoothly transition between values.
 
-### Motion Controls
-Use motion controllers for more advanced animation control:
-- Set minimum/maximum values
-- Control steps per cycle
-- Choose movement patterns
-- Apply to any numeric parameter
+## 🧩 Components
 
-### Sequence Controls
-Sequence controls allow you to specify exact values to cycle through. You can control:
-- Steps per item: How many frames to show each value
-- Sequence mode: forward, reverse, pingpong, or random
+The extension organizes MediaPipe functionality into these components:
 
-### FPS Monitor
-Outputs an image and mask showing current and average FPS. Useful for performance monitoring in real-time workflows.
+1. **Model Loaders** - Each task has a loader node that prepares the appropriate model
+2. **Processing Nodes** - Task-specific nodes that process images
+3. **Visualization Nodes** - Optional nodes to render detection results
+4. **Control Nodes** - Delta tracking and movement detection to control parameters
+5. **Utility Nodes** - Helper nodes for masks, tracking, and result processing
 
-### Utility Controls
-Use utility nodes to optimize and control your workflow:
-- **FPS Monitor**: Monitor performance with a visual overlay
-- **SimilarityFilter**: Skip processing of similar frames by comparing consecutive images. Great for optimizing real-time workflows by only processing frames that have meaningful changes.
-- **LazyCondition**: Create conditional execution paths that truly skip processing of unused branches. Works with any input type (images, latents, text, numbers) and maintains state of the last successful output to avoid feedback loops.
+## ⚙️ Control Nodes
 
-## Examples 🎬
+Control nodes convert MediaPipe landmark tracking into ComfyUI parameters, enabling dynamic control of your workflows:
 
-### Value Control Demo
-In this demo we are controlling the width and height of a shape mask with an Int Control node. Imagine controlling the denoise on a KSampler with a Float Control, though! Or CFG in StreamDiffusion!
-![Value Control Demo](assets/ValueControl.gif)
+### Types of Control Nodes
 
-### Motion Detection Blur Demo
-Example of motion-based active blur effect running in ComfyStream. The action here is to control the blur amount of the frame here, but imagine if the action was "fire weapon":
-![Motion Active Blur Demo](https://github.com/user-attachments/assets/e2a7a5e2-651a-4b0d-b3f9-12cb40acce04)
+- **Delta Control Nodes** - Convert movement of tracked points into INT/FLOAT values
+- **Head Pose Control Nodes** - Convert face orientation (yaw/pitch/roll) into parameters
+- **Trigger Nodes** - Create boolean triggers when movements or poses cross thresholds
 
-## Installation 💻
+### Available Controls:
 
-### Option 1: ComfyUI Manager 📦
-The easiest way to install is through [ComfyUI Manager](https://github.com/ltdrdata/ComfyUI-Manager):
-1. Install ComfyUI Manager if you haven't already
-2. Open ComfyUI
-3. Navigate to the Manager tab
-4. Search for "Control Nodes"
-5. Click Install
+| Feature | Control Types | Example Applications |
+|---------|--------------|---------------------|
+| **Face** | Head Pose (yaw/pitch/roll/position), Blendshape expressions | Camera control, gaze-directed generation, emotion-based parameters |
+| **Hand** | Landmark delta tracking, finger position/movement | UI control, gesture-based adjustments, pinch-to-zoom effects |
+| **Pose** | Body landmark movement, joint tracking | Animation control, posture-based parameters |
 
-### Option 2: Manual Installation ⚙️
-1. Clone this repository into your ComfyUI custom_nodes folder:
+### Head Pose Controls
+
+The Head Pose Control nodes provide these specific controls:
+- **Yaw** - Head turning left/right (horizontal rotation)
+- **Pitch** - Head nodding up/down (vertical rotation)
+- **Roll** - Head tilting side to side
+- **X/Y/Z Position** - 3D spatial position of head
+
+### Facial Expression Controls
+
+MediaPipe's face landmark detection includes blendshape coefficients that can be used to control parameters based on facial expressions. There are ~40 expression attributes that can be used. Each expression can be mapped to INT/FLOAT outputs for precise control over generation parameters, or used as triggers for workflow events.
+
+### Usage Examples
+
+- Connect index finger movement to control seed randomization
+- Use head yaw position to control left/right panning in a scene
+- Trigger workflow steps when a user nods (pitch movement)
+- Map hand pinching gesture to control zoom level
+- Adjust diffusion strength based on how fast someone moves
+- Use smile intensity to control positive prompt weighting
+- Trigger different styles when specific facial expressions are detected
+
+Check out the [examples directory](examples/) for sample workflows demonstrating how to use the control nodes with different MediaPipe features.
+
+
+## 🛠️ Installation
+
+Use the ComfyUI-Manager, or....
+
 ```bash
+# Navigate to your ComfyUI custom_nodes directory
 cd ComfyUI/custom_nodes
-git clone https://github.com/ryanontheinside/ComfyUI_RealTimeNodes
-```
 
-2. Install the required dependencies:
-```bash
-cd ComfyUI_RealTimeNodes
+# Clone the repository
+git clone https://github.com/your-username/ComfyUI-MediaPipe-Vision.git
+
+# Enter the directory
+cd ComfyUI-MediaPipe-Vision
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Restart ComfyUI
 ```
 
-## Coming Soon 🚀
+> **Note:** GPU Support varies by platform. Generally, for Linux platforms, you can reference [these instructions](https://ai.google.dev/edge/mediapipe/framework/getting_started/gpu_support) to enable GPU support.
 
-### Advanced Detection System 👁️
-The next major update will introduce a comprehensive detection system with multiple detector types:
-- **Motion Detection**: Enhanced motion detection with configurable sensitivity and regions
-- **Object Detection**: Real-time object detection and tracking
-- **Face Detection**: Face detection and landmark tracking
-- **Pose Detection**: Human pose estimation and tracking
-- **Depth Detection**: Real-time depth estimation and segmentation
+## 🔍 Usage Guide
 
-These detection systems will provide powerful inputs for real-time ComfyUI workflows, enabling dynamic responses to various types of detected changes in the input stream.
+### Basic Workflow
 
-## Project Status 📊
+1. Add a `Load ... Model (MediaPipe)` node for your task
+2. Connect your image and the model info to the processor node
+3. Use the outputs with visualization nodes or in your ComfyUI workflow
 
-This is an evolving project that aims to expand the real-time capabilities of ComfyUI. As real-time use cases for ComfyUI continue to emerge and grow, this project will adapt and expand to meet those needs. The goal is to provide a comprehensive suite of tools for real-time workflows, from simple value animations to complex detection and response systems.
+### Example: Face Landmark Detection
 
-### Contributing 🤝
+```
+[Load Face Landmarker Model] → model_info → [Face Landmarker] ← image
+                                               |
+                                               ↓ landmarks
+                                 [Visualize Face Landmarks] ← original_image
+                                               |
+                                               ↓ visualization
+                                           [Preview]
+```
 
-Your feedback and contributions are more than welcome! This project grows stronger with community input.
+### Example: Movement Tracking
 
-- Have an idea? Open an issue! 💡
-- Found a bug? Open an issue! 🐛
-- Made an improvement? Submit a PR! 🎉
-- Want to help? Join the discussion! 💬
+```
+[Load Hand Landmarker Model] → model_info → [Hand Landmarker] ← webcam_image
+                                               |
+                                               ↓ landmarks
+                         [Hand Landmark Delta Float Control] (index_finger_tip)
+                                               |
+                                               ↓ float_value
+                                      [Any Comfy Parameter]
+```
 
-Please visit our [GitHub Issues](https://github.com/ryanontheinside/ComfyUI_RealTimeNodes/issues) page to contribute.
+## 📓 Technical Notes
 
-## Related Projects 🔗
+* Models download automatically to `ComfyUI/models/mediapipe/<task_type>/`
+* Nodes support batch processing for multiple images
+* CPU processing works on most systems; GPU support depends on configuration
 
-### ComfyUI_RyanOnTheInside - Everything Reactivity ⚡
-Make anything react to anything in your ComfyUI workflows. [ComfyUI_RyanOnTheInside](https://github.com/ryanontheinside/ComfyUI_RyanOnTheInside) - my main custom nodes suite that brings complete reactive control to standard ComfyUI workflows:
+## 🤝 Contributing
 
-- Dynamic node relationships
-- React to audio, MIDI, motion, time, depth, color, Whisper, and more
-- Audio source separation and manipulation
-- Reactive particle systems
-- Reactive text generation
-- Reactive image generation
-- Reactive video generation
-- Optical flow
-- Reactive IPAdapters and CogVideo
-- Reactive Live Portrait
-- Reactive DepthFlow
-- Actually more
+Contributions are welcome! For bugs or suggestions for improvements, please open an issue or submit a pull request.
 
-Use it alongside these Control Nodes to master parameter control in both the batch and real-time paradigms in ComfyUI! The POWER!!
+**Feature Requests Strongly Encouraged!** This project provides a flexible infrastructure that can be adapted to many different use cases. While several basic capabilities are implemented, the project aims to address more use cases and problems:
+
+- Have an idea for creative AI interactions using vision?
+- Need a specific type of landmark tracking or detection?
+- Working on a unique workflow that could benefit from real-time vision?
+- Found limitations in the current implementation for your use case?
+
+Please open an issue to discuss your needs even if you're not sure how to implement them. The MediaPipe framework is powerful and extensible, and this project aims to make that power accessible within ComfyUI for any computer vision application.
+
+## 📜 License
+
+[MIT License](LICENSE)
+
+
+

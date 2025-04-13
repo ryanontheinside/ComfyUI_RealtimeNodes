@@ -1,4 +1,3 @@
-# Python cache files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -19,23 +18,4 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Virtual environments
-venv/
-ENV/
-
-# IDE files
-.idea/
-.vscode/
-.cursor/
-*.swp
-*.swo
-
-/.cursor
-
-# Ignore assets folder but keep the folder structure
-assets/*
-!assets/.gitkeep
-
-# IDE specific files
 .DS_Store
