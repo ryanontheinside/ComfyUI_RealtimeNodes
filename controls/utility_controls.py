@@ -267,6 +267,92 @@ class LazyCondition(ControlNodeBase):
             else:
                 return (state["prev_output"],)
 
+class LogicOperator(ControlNodeBase):
+    DESCRIPTION = "Performs logical operations (AND, OR, NOT, XOR) on inputs based on their truthiness"
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "operation": (["AND", "OR", "NOT", "XOR"], {
+                    "default": "AND",
+                    "tooltip": "Logical operation to perform"
+                }),
+                "input_a": (AlwaysEqualProxy("*"), {
+                    "tooltip": "First input to evaluate for truthiness",
+                    "forceInput": True,
+                }),
+                "always_execute": ("BOOLEAN", {
+                    "default": True,
+                }),
+            },
+            "optional": {
+                "input_b": (AlwaysEqualProxy("*"), {
+                    "tooltip": "Second input to evaluate for truthiness (not used for NOT operation)",
+                }),
+            }
+        }
+    
+    RETURN_TYPES = ("BOOLEAN",)
+    FUNCTION = "update"
+    CATEGORY = "real-time/control/logic"
+
+    def update(self, operation, input_a, always_execute=True, input_b=None):
+        """Perform the selected logical operation on inputs based on their truthiness."""
+        a = bool(input_a)
+        
+        if operation == "NOT":
+            return (not a,)
+        
+        # For all other operations, we need input_b
+        b = bool(input_b)
+        
+        if operation == "AND":
+            return (a and b,)
+        elif operation == "OR":
+            return (a or b,)
+        elif operation == "XOR":
+            return (a != b,)
+        
+        # Should never get here, but just in case
+        return (False,)
+
+class IfThenElse(ControlNodeBase):
+    DESCRIPTION = "Selects between two values based on a condition's truthiness"
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "condition": (AlwaysEqualProxy("*"), {
+                    "tooltip": "When truthy, outputs then_value; when falsy, outputs else_value",
+                    "forceInput": True,
+                }),
+                "then_value": (AlwaysEqualProxy("*"), {
+                    "tooltip": "Value to output when condition is truthy",
+                    "forceInput": True,
+                }),
+                "else_value": (AlwaysEqualProxy("*"), {
+                    "tooltip": "Value to output when condition is falsy",
+                    "forceInput": True,
+                }),
+                "always_execute": ("BOOLEAN", {
+                    "default": True,
+                }),
+            }
+        }
+    
+    RETURN_TYPES = (AlwaysEqualProxy("*"),)
+    FUNCTION = "update"
+    CATEGORY = "real-time/control/logic"
+
+    def update(self, condition, then_value, else_value, always_execute=True):
+        """Select between then_value and else_value based on condition truthiness."""
+        if condition:  # Let Python handle truthiness
+            return (then_value,)
+        else:
+            return (else_value,)
+
 
 
 
