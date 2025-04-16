@@ -1,14 +1,14 @@
 from .controls.value_controls import FloatControl, IntControl, StringControl
 from .controls.sequence_controls import FloatSequence, IntSequence, StringSequence
-from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition
+from .controls.utility_controls import FPSMonitor, SimilarityFilter, LazyCondition, LogicOperator, IfThenElse   
 from .controls.state_management_controls import StateResetNode, StateTestNode
 from .controls.motion_controls import MotionController, ROINode, IntegerMotionController
 from .misc_nodes import( 
-    DTypeConverter, 
-    FastWebcamCapture, 
+    DTypeConverter,
+    FastWebcamCapture,
     YOLOSimilarityCompare, 
-    TextRenderer, 
-    QuickShapeMask,  
+    TextRenderer,
+    QuickShapeMask,
     MultilineText, 
     LoadImageFromPath_
 )
@@ -28,6 +28,8 @@ NODE_CLASS_MAPPINGS = {
     "FPSMonitor": FPSMonitor,
     "SimilarityFilter": SimilarityFilter,
     "LazyCondition": LazyCondition,
+    "LogicOperator": LogicOperator,
+    "IfThenElse": IfThenElse,
     "MotionController": MotionController,
     "IntegerMotionController": IntegerMotionController,
     "YOLOSimilarityCompare": YOLOSimilarityCompare,
@@ -40,7 +42,7 @@ NODE_CLASS_MAPPINGS = {
     "LoadImageFromPath_": LoadImageFromPath_,
     "HandTrackingNode": HandTrackingNode,
     "HandMaskNode": HandMaskNode,
-    #"RepulsiveMaskNode": RepulsiveMaskNode,
+    "RepulsiveMaskNode": RepulsiveMaskNode,
     "ResizeMaskNode": ResizeMaskNode,
     "StateResetNode": StateResetNode,
     "StateTestNode": StateTestNode,
