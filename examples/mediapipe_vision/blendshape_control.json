@@ -1,0 +1,191 @@
+{
+  "1": {
+    "inputs": {
+      "image": "broccoli.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "3": {
+    "inputs": {
+      "num_faces": 1,
+      "min_face_detection_confidence": 0.5,
+      "min_face_presence_confidence": 0.5,
+      "min_tracking_confidence": 0.5,
+      "output_blendshapes": true,
+      "output_transform_matrix": true,
+      "running_mode": "video",
+      "delegate": "cpu",
+      "image": [
+        "6",
+        0
+      ],
+      "model_info": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "MediaPipeFaceLandmarker",
+    "_meta": {
+      "title": "Face Landmarker (MediaPipe)"
+    }
+  },
+  "4": {
+    "inputs": {
+      "model_variant": "default"
+    },
+    "class_type": "MediaPipeFaceLandmarkerModelLoader",
+    "_meta": {
+      "title": "Load Face Landmarker Model (MediaPipe)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "image": "harold.png",
+      "upload": "image"
+    },
+    "class_type": "PrimaryInputLoadImage",
+    "_meta": {
+      "title": "PrimaryInputLoadImage"
+    }
+  },
+  "7": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "6",
+        0
+      ],
+      "source": [
+        "1",
+        0
+      ],
+      "mask": [
+        "18",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "8": {
+    "inputs": {
+      "value": [
+        "21",
+        0
+      ],
+      "width": 512,
+      "height": 512
+    },
+    "class_type": "SolidMask",
+    "_meta": {
+      "title": "SolidMask"
+    }
+  },
+  "15": {
+    "inputs": {
+      "part_name": "FACE_OVAL",
+      "face_landmarks": [
+        "16",
+        0
+      ],
+      "image_for_dimensions": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "MaskFromFaceLandmarks",
+    "_meta": {
+      "title": "Mask From Face Landmarks (MediaPipe)"
+    }
+  },
+  "16": {
+    "inputs": {
+      "num_faces": 1,
+      "min_face_detection_confidence": 0.5,
+      "min_face_presence_confidence": 0.5,
+      "min_tracking_confidence": 0.5,
+      "output_blendshapes": true,
+      "output_transform_matrix": true,
+      "running_mode": "video",
+      "delegate": "cpu",
+      "image": [
+        "6",
+        0
+      ],
+      "model_info": [
+        "17",
+        0
+      ]
+    },
+    "class_type": "MediaPipeFaceLandmarker",
+    "_meta": {
+      "title": "Face Landmarker (MediaPipe)"
+    }
+  },
+  "17": {
+    "inputs": {
+      "model_variant": "default"
+    },
+    "class_type": "MediaPipeFaceLandmarkerModelLoader",
+    "_meta": {
+      "title": "Load Face Landmarker Model (MediaPipe)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "operation": "subtract",
+      "destination": [
+        "8",
+        0
+      ],
+      "source": [
+        "15",
+        0
+      ]
+    },
+    "class_type": "MaskComposite",
+    "_meta": {
+      "title": "MaskComposite"
+    }
+  },
+  "21": {
+    "inputs": {
+      "blendshape_name": "jawOpen",
+      "score_min": 0,
+      "score_max": 1,
+      "output_min_float": 0,
+      "output_max_float": 1,
+      "clamp": true,
+      "blendshapes": [
+        "3",
+        1
+      ]
+    },
+    "class_type": "BlendshapeControlFloat",
+    "_meta": {
+      "title": "Blendshape Control (Float)"
+    }
+  },
+  "25": {
+    "inputs": {
+      "images": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  }
+}
