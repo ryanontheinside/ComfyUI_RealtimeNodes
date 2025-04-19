@@ -1,4 +1,4 @@
-from ..base.control_base import ControlNodeBase
+from ....src.realtimenodes.control_base import ControlNodeBase
 
 class SequenceControlBase(ControlNodeBase):
     """Base class for sequence-based controls"""

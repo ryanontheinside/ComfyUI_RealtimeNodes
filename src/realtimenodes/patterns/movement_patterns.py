@@ -1,4 +1,4 @@
-from ..base.control_base import Pattern
+from ..control_base import Pattern
 import math
 import random
 
