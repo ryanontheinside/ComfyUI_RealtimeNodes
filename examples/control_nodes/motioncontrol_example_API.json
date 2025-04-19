@@ -207,7 +207,7 @@
   },
   "39": {
     "inputs": {
-      "image": "dead_inside_512.png",
+      "image": "harold.png",
       "upload": "image"
     },
     "class_type": "LoadImage",
