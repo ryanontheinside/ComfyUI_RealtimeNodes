@@ -8,7 +8,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageOps
 import nodes
 import random
 from torchvision import transforms
-from .utils import AlwaysEqualProxy
+from ...src.utils.general_utils import AlwaysEqualProxy
 MAX_RESOLUTION = nodes.MAX_RESOLUTION  # Get the same max resolution as core nodes
 
 class DTypeConverter:
@@ -437,7 +437,9 @@ class TextRenderer:
         
         # Load font from assets directory
         import os
-        font_path = os.path.join(os.path.dirname(__file__), "fonts", "dejavu-sans", "DejaVuSans.ttf")
+        # Construct the path relative to the main package directory
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")) # Go up 3 levels
+        font_path = os.path.join(base_path, "fonts", "dejavu-sans", "DejaVuSans.ttf")
         try:
             pil_font = ImageFont.truetype(font_path, font_size)
         except Exception as e:

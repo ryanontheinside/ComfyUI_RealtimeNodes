@@ -1,4 +1,4 @@
-from ..base.control_base import ControlNodeBase
+from ....src.realtimenodes.control_base import ControlNodeBase
 
 class StateResetNode(ControlNodeBase):
     """Node that resets all control node states when triggered"""
