@@ -65,7 +65,7 @@ class FloatSequence(SequenceControlBase):
     
     RETURN_TYPES = ("FLOAT",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/sequence"
+    CATEGORY = "Realtime Nodes/control/sequence"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -88,7 +88,7 @@ class IntSequence(SequenceControlBase):
     
     RETURN_TYPES = ("INT",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/sequence"
+    CATEGORY = "Realtime Nodes/control/sequence"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -111,7 +111,7 @@ class StringSequence(SequenceControlBase):
     
     RETURN_TYPES = ("STRING",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/sequence"
+    CATEGORY = "Realtime Nodes/control/sequence"
 
     @classmethod
     def INPUT_TYPES(cls):

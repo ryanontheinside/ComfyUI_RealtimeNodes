@@ -16,7 +16,7 @@ class FPSMonitor(ControlNodeBase):
     
     RETURN_TYPES = ("IMAGE", "MASK")
     FUNCTION = "update"
-    CATEGORY = "real-time/control/utility"
+    CATEGORY = "Realtime Nodes/control/utility"
     
     @classmethod
     def INPUT_TYPES(cls):
@@ -162,7 +162,7 @@ class SimilarityFilter(ControlNodeBase):
     RETURN_TYPES = ("IMAGE", "BOOLEAN")
     RETURN_NAMES = ("image", "should_execute")
     FUNCTION = "update"
-    CATEGORY = "real-time/control/utility"
+    CATEGORY = "Realtime Nodes/control/utility"
 
     def __init__(self):
         super().__init__()

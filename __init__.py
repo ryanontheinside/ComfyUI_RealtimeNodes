@@ -5,7 +5,7 @@ import re
 import traceback
 
 # Directory containing node wrapper modules relative to this __init__.py
-WRAPPER_DIR = "node_wrappers.realtimenodes"
+WRAPPER_DIR = "node_wrappers"
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
@@ -13,7 +13,7 @@ print("\033[93m" + "[ComfyUI_RealtimeNodes] Loading nodes...")
 
 def load_nodes_from_directory(package_path):
     """Dynamically loads nodes from Python files in a directory."""
-    loaded_nodes = {}
+    loaded_nodes = {} 
     loaded_display_names = {}
     
     # Calculate absolute path to the package directory
@@ -61,22 +61,43 @@ def load_nodes_from_directory(package_path):
 
 # --- Main Loading Logic ---
 
-# Define the subdirectories within WRAPPER_DIR to scan
-# Order might matter if there are dependencies between modules, though ideally there shouldn't be
-subdirs_to_scan = [
-    "controls",
-    "media",
-    "utils",
-    "specialized" # Add other subdirs like 'specialized' if needed
-]
+# Get base path for the node_wrappers directory
+base_dir_path = os.path.join(os.path.dirname(__file__), WRAPPER_DIR)
 
-# Iterate through specified subdirectories and load nodes
-for subdir in subdirs_to_scan:
-    dir_path = f"{WRAPPER_DIR}.{subdir}"
-    nodes, display_names = load_nodes_from_directory(dir_path)
-    NODE_CLASS_MAPPINGS.update(nodes)
-    NODE_DISPLAY_NAME_MAPPINGS.update(display_names)
+# Recursively scan all directories and subdirectories
+def scan_for_modules(base_path, base_package):
+    """Recursively scan directories for module files"""
+    try:
+        for item in os.listdir(base_path):
+            item_path = os.path.join(base_path, item)
+            
+            # Skip __pycache__ and files/dirs starting with __
+            if item.startswith('__'):
+                continue
+                
+            if os.path.isdir(item_path):
+                # Handle subdirectory
+                subdir_package = f"{base_package}.{item}"
+                
+                # First load .py files in this directory
+                try:
+                    nodes, display_names = load_nodes_from_directory(subdir_package)
+                    NODE_CLASS_MAPPINGS.update(nodes)
+                    NODE_DISPLAY_NAME_MAPPINGS.update(display_names)
+                except Exception as e:
+                    print(f"\033[91m" + f"[ComfyUI_RealtimeNodes] Error processing directory {subdir_package}: {e}")
+                    traceback.print_exc()
+                
+                # Then recursively process subdirectories
+                subdir_path = os.path.join(base_path, item)
+                scan_for_modules(subdir_path, subdir_package)
+    except Exception as e:
+        print(f"\033[91m" + f"[ComfyUI_RealtimeNodes] Error scanning directory {base_path}: {e}")
+        traceback.print_exc()
 
+# Start recursive scanning from the base directory
+print(f"\033[92m" + f"[ComfyUI_RealtimeNodes] Scanning node_wrappers directory for modules...")
+scan_for_modules(base_dir_path, WRAPPER_DIR)
 
 suffix = " 🕒🅡🅣🅝"
 
