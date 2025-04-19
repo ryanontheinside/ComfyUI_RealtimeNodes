@@ -1,4 +1,4 @@
-from ..base.control_base import ControlNodeBase
+from ....src.realtimenodes.control_base import ControlNodeBase
 from enum import Enum
 import numpy as np
 import torch
