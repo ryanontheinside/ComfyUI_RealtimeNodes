@@ -1,5 +1,5 @@
-from ..base.control_base import ControlNodeBase
-from ..patterns.movement_patterns import MOVEMENT_PATTERNS
+from ....src.realtimenodes.control_base import ControlNodeBase
+from ....src.realtimenodes.patterns.movement_patterns import MOVEMENT_PATTERNS
 
 class ValueControlBase(ControlNodeBase):
     """Base class for float and integer control nodes"""
