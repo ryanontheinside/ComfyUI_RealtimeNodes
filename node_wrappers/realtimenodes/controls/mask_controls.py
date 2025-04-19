@@ -48,7 +48,7 @@ class RepulsiveMaskNode(ControlNodeBase, MaskControlMixin):
 
     RETURN_TYPES = ("MASK",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/mask"
+    CATEGORY = "Realtime Nodes/control/mask"
 
     def interact(self, mask, input_mask_np, state, strength, height, width, is_attract):
         if np.max(input_mask_np) < 0.1:
@@ -168,7 +168,7 @@ class ResizeMaskNode(ControlNodeBase, MaskControlMixin):
 
     RETURN_TYPES = ("MASK",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/mask"
+    CATEGORY = "Realtime Nodes/control/mask"
 
     def resize(self, mask, input_mask_np, state, strength, height, width):
         if np.max(input_mask_np) < 0.1:

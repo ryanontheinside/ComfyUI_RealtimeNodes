@@ -18,7 +18,7 @@ class StateResetNode(ControlNodeBase):
 
     RETURN_TYPES = ("BOOLEAN",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/utility"
+    CATEGORY = "Realtime Nodes/control/utility"
 
     def update(self, trigger, always_execute=True):
         print(f"\n=== StateResetNode UPDATE - node_id: {self.node_id} ===")
@@ -49,7 +49,7 @@ class StateTestNode(ControlNodeBase):
 
     RETURN_TYPES = ("INT",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/utility"
+    CATEGORY = "Realtime Nodes/control/utility"
 
     def update(self, increment, always_execute=True):
         print(f"\n=== StateTestNode UPDATE - node_id: {self.node_id} ===")

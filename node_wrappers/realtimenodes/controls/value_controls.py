@@ -85,7 +85,7 @@ class FloatControl(ValueControlBase):
 
     RETURN_TYPES = ("FLOAT",)
     FUNCTION = "update_value"
-    CATEGORY = "real-time/control/value"
+    CATEGORY = "Realtime Nodes/control/value"
     
     def update_value(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute=True):
         return self.update_value_base(maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute)
@@ -124,7 +124,7 @@ class IntControl(ValueControlBase):
 
     RETURN_TYPES = ("INT",)
     FUNCTION = "update_value"
-    CATEGORY = "real-time/control/value"
+    CATEGORY = "Realtime Nodes/control/value"
     
     def update_value(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute=True):
         result = self.update_value_base(maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute)
@@ -159,7 +159,7 @@ class StringControl(ControlNodeBase):
 
     RETURN_TYPES = ("STRING",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/value"
+    CATEGORY = "Realtime Nodes/control/value"
     
     def update(self, strings, steps_per_cycle, movement_type, always_execute=True):
         # Split the input strings into a list
