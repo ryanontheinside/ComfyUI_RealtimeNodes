@@ -42,7 +42,7 @@ class HandTrackingNode:
     RETURN_NAMES = ("debug_image", "hand_data")
     FUNCTION = "track_hands"
     CATEGORY = "image/processing"
-    
+    DESCRIPTION = "(((EXPERIMENTAL))) Track hands in an image using MediaPipe. Returns a debug image with landmarks and a dictionary of hand data."
     def __init__(self):
         self.last_detection_conf = 0.5
         self.last_tracking_conf = 0.5
