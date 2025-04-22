@@ -1,6 +1,10 @@
 from ....src.realtimenodes.control_base import ControlNodeBase
 import copy
 from ....src.utils.general_utils import AlwaysEqualProxy
+import server
+
+# Reference to our server's workflow_states store
+from ....server import workflow_states
 
 class StateResetNode(ControlNodeBase):
     """Node that resets all control node states when triggered"""
@@ -70,7 +74,7 @@ class GetStateNode(ControlNodeBase):
     RETURN_TYPES = (AlwaysEqualProxy("*"),)
     RETURN_NAMES = ("value",)
     FUNCTION = "update"
-    DESCRIPTION = "Retrieve a value from the global state using the given key. If the key is not found, return the default value."
+    DESCRIPTION = "(Experimental) Retrieve a value from the global state using the given key. If the key is not found, return the default value."
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
@@ -78,22 +82,23 @@ class GetStateNode(ControlNodeBase):
             "key": ("STRING", {"default": "default_key", "tooltip": "The key to retrieve the value from. If not provided, the default value will be returned."}),
             "default_value": (AlwaysEqualProxy("*"), {"tooltip": "The value to return if the key is not found."}),
             "use_default": ("BOOLEAN", {"default": False, "tooltip": "If True, the default value will be returned if the key is not found."}),
+            "workflow_id": ("STRING", {"default": "", "tooltip": "The workflow ID (automatically set by UI)."}),
         })
         return inputs
     
-    def update(self, key: str, default_value, use_default: bool, always_execute=True):
+    def update(self, key: str, default_value, use_default: bool, workflow_id: str = "", always_execute=True):
         """
         Retrieve a value from the global state using the given key.
         """
-        if not key or use_default:
+        if not key or use_default or not workflow_id:
             return (default_value,)
         
-        # Get the shared state dictionary
-        shared_state = self.state_manager.get_state("__shared_keys__", {})
+        # Look up the value in the server-side workflow states
+        workflow_state = workflow_states.get(workflow_id, {})
+        value = workflow_state.get(key)
         
-        # Check if the key exists
-        if key in shared_state:
-            return (shared_state[key],)
+        if value is not None:
+            return (value,)
         
         # Return default value if key not found
         return (default_value,)
@@ -108,27 +113,32 @@ class SetStateNode(ControlNodeBase):
     RETURN_NAMES = ("value",)
     FUNCTION = "update"
     OUTPUT_NODE = True
-    DESCRIPTION = "Store a value in the global state with the given key. The value will be accessible in future workflow runs through GetStateNode."
+    DESCRIPTION = "(Experimental) Store a value in the global state with the given key. The value will be accessible in future workflow runs through GetStateNode."
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
         inputs["required"].update({
             "key": ("STRING", {"default": "default_key", "tooltip": "The key to store the value under. If not provided, the value will not be stored."}),
             "value": (AlwaysEqualProxy("*"), {"tooltip": "The value to store in the global state."}),
+            "workflow_id": ("STRING", {"default": "", "tooltip": "The workflow ID (automatically set by UI)."}),
         })
         return inputs
     
-    def update(self, key: str, value, always_execute=True):
+    def update(self, key: str, value, workflow_id: str = "", always_execute=True):
         """
         Store a value in the global state with the given key.
         """
-        if not key:
+        if not key or not workflow_id:
             return (value,)
         
         try:
-            shared_state = self.state_manager.get_state("__shared_keys__", {})
-            shared_state[key] = copy.deepcopy(value)
-            self.state_manager.set_state("__shared_keys__", shared_state)
+            # Ensure the workflow exists in the states
+            if workflow_id not in workflow_states:
+                workflow_states[workflow_id] = {}
+            
+            # Store the value in the server-side workflow state
+            workflow_states[workflow_id][key] = copy.deepcopy(value)
+            
         except Exception as e:
             print(f"[State Node] Error storing value: {str(e)}")
         
