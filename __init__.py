@@ -114,6 +114,15 @@ for node_name in NODE_CLASS_MAPPINGS.keys():
     
     # Assign the final display name to the mappings
     NODE_DISPLAY_NAME_MAPPINGS[node_name] = display_name
+
+# Import server routes
+try:
+    from . import server
+    print("\033[92m" + "[ComfyUI_RealtimeNodes] API routes registered.")
+except Exception as e:
+    print("\033[91m" + f"[ComfyUI_RealtimeNodes] Error registering API routes: {e}")
+    traceback.print_exc()
+
 # --- Original Web Directory and Export ---
 WEB_DIRECTORY = "./web/js" # Adjusted path if needed
 
