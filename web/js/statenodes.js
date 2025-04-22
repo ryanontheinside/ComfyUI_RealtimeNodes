@@ -1,4 +1,66 @@
 import { app } from "../../../scripts/app.js";
+import { stateApi } from "./stateApi.js";
+
+// Workflow namespace manager
+const workflowManager = {
+    // Get the current workflow ID or generate a new one
+    getWorkflowId: function() {
+        if (!app.graph.extra) {
+            app.graph.extra = {};
+        }
+        
+        if (!app.graph.extra.realtimeNodesState) {
+            // Generate a new workflow ID (timestamp + random)
+            const newId = `wf_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+            app.graph.extra.realtimeNodesState = { workflowId: newId };
+            app.graph.change(); // Ensure it gets saved
+        }
+        
+        return app.graph.extra.realtimeNodesState.workflowId;
+    },
+    
+    // Set a state value using the API
+    setState: function(key, value) {
+        const workflowId = this.getWorkflowId();
+        return stateApi.setValue(workflowId, key, value);
+    },
+    
+    // Get a state value using the API
+    getState: function(key) {
+        const workflowId = this.getWorkflowId();
+        return stateApi.getValue(workflowId, key);
+    },
+    
+    // Delete a state value using the API
+    deleteState: function(key) {
+        const workflowId = this.getWorkflowId();
+        return stateApi.deleteValue(workflowId, key);
+    },
+    
+    // Get all state values for the current workflow
+    getAllState: function() {
+        const workflowId = this.getWorkflowId();
+        return stateApi.getAllValues(workflowId);
+    },
+    
+    // Clear all state for the current workflow
+    clearAllState: function() {
+        const workflowId = this.getWorkflowId();
+        return stateApi.clearAllValues(workflowId);
+    },
+    
+    // Create a namespaced key using the workflow ID (for display only)
+    getNamespacedKey: function(key) {
+        return `${this.getWorkflowId()}:${key}`;
+    },
+    
+    // Extract the user-facing key from a namespaced key
+    extractUserKey: function(namespacedKey) {
+        if (!namespacedKey) return "";
+        const parts = namespacedKey.split(":");
+        return parts.length > 1 ? parts[1] : namespacedKey;
+    }
+};
 
 // Track all keys available
 const stateKeys = new Set();
@@ -135,6 +197,17 @@ function updateAllGetNodesDropdowns(graph) {
     });
 }
 
+// Helper to properly disable a widget
+function disableWidget(widget) {
+    if (widget) {
+        widget.disabled = true;
+        widget.visibleWidth = 0;
+        widget.onMouseDown = () => {};
+        widget.onMouseMove = () => {};
+        widget.onMouseUp = () => {};
+    }
+}
+
 // Register the SetStateNode for UI customization
 app.registerExtension({
     name: "SetStateNode",
@@ -151,6 +224,19 @@ app.registerExtension({
             // Store reference to the node
             const node = this;
             
+            // Add hidden workflow_id widget
+            // Find if workflow_id widget already exists
+            let workflowIdWidget = node.widgets.find(w => w.name === "workflow_id");
+            if (!workflowIdWidget) {
+                const workflowId = workflowManager.getWorkflowId();
+                workflowIdWidget = node.addWidget("text", "workflow_id", workflowId, () => {}, {
+                    serialize: false,
+                    disabled: true
+                });
+                workflowIdWidget.hidden = true;
+                disableWidget(workflowIdWidget);
+            }
+            
             // Track key changes
             const keyWidget = node.widgets.find(w => w.name === "key");
             if (keyWidget) {
@@ -165,6 +251,9 @@ app.registerExtension({
                         stateKeys.add(value);
                         node.title = "Set State: " + value;
                         
+                        // Store the namespaced key in a hidden property
+                        node._namespacedKey = workflowManager.getNamespacedKey(value);
+                        
                         // Update all GetStateNodes
                         if (node.graph) {
                             updateAllGetNodesDropdowns(node.graph);
@@ -176,6 +265,7 @@ app.registerExtension({
                 if (keyWidget.value && keyWidget.value.trim() !== "") {
                     stateKeys.add(keyWidget.value);
                     node.title = "Set State: " + keyWidget.value;
+                    node._namespacedKey = workflowManager.getNamespacedKey(keyWidget.value);
                 }
             }
             
@@ -237,6 +327,65 @@ app.registerExtension({
                     }
                 }
             };
+            
+            // Hook into the onExecuted event to ensure we're using the namespaced key
+            const onExecuted = node.onExecuted;
+            node.onExecuted = function(message) {
+                if (onExecuted) {
+                    onExecuted.apply(this, arguments);
+                }
+                
+                // Get key and value from the node
+                const keyWidget = node.widgets.find(w => w.name === "key");
+                const valueWidget = node.widgets.find(w => w.name === "value");
+                
+                if (keyWidget && keyWidget.value && keyWidget.value.trim() !== "") {
+                    // Save the value to the server-side state
+                    const key = keyWidget.value;
+                    const value = message?.output?.value; // Get value from execution result
+                    
+                    // Use the state API to save the value
+                    workflowManager.setState(key, value)
+                        .then(() => {
+                            console.log(`State value set for key: ${key}`);
+                        })
+                        .catch(error => {
+                            console.error(`Error setting state value for key: ${key}`, error);
+                        });
+                }
+            };
+        };
+        
+        // Modify the serialize method to include the namespaced key
+        const onSerialize = nodeType.prototype.onSerialize;
+        nodeType.prototype.onSerialize = function(info) {
+            if (onSerialize) {
+                onSerialize.apply(this, arguments);
+            }
+            
+            // Add the namespaced key to the serialized data
+            const keyWidget = this.widgets.find(w => w.name === "key");
+            if (keyWidget && keyWidget.value && keyWidget.value.trim() !== "") {
+                info.namespacedKey = workflowManager.getNamespacedKey(keyWidget.value);
+            }
+        };
+        
+        // Modify the configure method to restore the namespaced key
+        const onConfigure = nodeType.prototype.onConfigure;
+        nodeType.prototype.onConfigure = function(info) {
+            if (onConfigure) {
+                onConfigure.apply(this, arguments);
+            }
+            
+            // Restore the namespaced key from the serialized data
+            if (info.namespacedKey) {
+                this.properties.namespacedKey = info.namespacedKey;
+            } else {
+                const keyWidget = this.widgets.find(w => w.name === "key");
+                if (keyWidget && keyWidget.value && keyWidget.value.trim() !== "") {
+                    this.properties.namespacedKey = workflowManager.getNamespacedKey(keyWidget.value);
+                }
+            }
         };
     }
 });
@@ -257,6 +406,19 @@ app.registerExtension({
             // Store reference to the node
             const node = this;
             
+            // Add hidden workflow_id widget
+            // Find if workflow_id widget already exists
+            let workflowIdWidget = node.widgets.find(w => w.name === "workflow_id");
+            if (!workflowIdWidget) {
+                const workflowId = workflowManager.getWorkflowId();
+                workflowIdWidget = node.addWidget("text", "workflow_id", workflowId, () => {}, {
+                    serialize: false,
+                    disabled: true
+                });
+                workflowIdWidget.hidden = true;
+                disableWidget(workflowIdWidget);
+            }
+            
             // Set node appearance
             this.color = "#2a363b";
             this.bgcolor = "#3f5159";
@@ -275,8 +437,11 @@ app.registerExtension({
                 const newWidget = node.addWidget("combo", "key", keyValue, function(value) {
                     if (value) {
                         node.title = "Get State: " + value;
+                        // Store the namespaced key in a hidden property
+                        node._namespacedKey = workflowManager.getNamespacedKey(value);
                     } else {
                         node.title = "Get State";
+                        node._namespacedKey = "";
                     }
                 }, { 
                     values: () => [...stateKeys].sort(),
@@ -289,9 +454,10 @@ app.registerExtension({
                     node.widgets.splice(index, 0, removed);
                 }
                 
-                // Initialize title
+                // Initialize title and namespaced key
                 if (newWidget.value) {
                     node.title = "Get State: " + newWidget.value;
+                    node._namespacedKey = workflowManager.getNamespacedKey(newWidget.value);
                 } else {
                     node.title = "Get State";
                 }
@@ -353,6 +519,65 @@ app.registerExtension({
                     }
                 }
             };
+            
+            // Hook into the onExecuted event to ensure we're using the namespaced key
+            const onExecuted = node.onExecuted;
+            node.onExecuted = function(message) {
+                if (onExecuted) {
+                    onExecuted.apply(this, arguments);
+                }
+                
+                // Get key from the node
+                const keyWidget = node.widgets.find(w => w.name === "key");
+                
+                if (keyWidget && keyWidget.value && keyWidget.value.trim() !== "") {
+                    const key = keyWidget.value;
+                    
+                    // Check if we need to refresh the state (for debugging)
+                    if (message?.output !== undefined) {
+                        // We could fetch the current value for validation
+                        workflowManager.getState(key)
+                            .then(value => {
+                                console.log(`Retrieved state for key: ${key}`, value);
+                            })
+                            .catch(error => {
+                                console.error(`Error retrieving state for key: ${key}`, error);
+                            });
+                    }
+                }
+            };
+        };
+        
+        // Modify the serialize method to include the namespaced key
+        const onSerialize = nodeType.prototype.onSerialize;
+        nodeType.prototype.onSerialize = function(info) {
+            if (onSerialize) {
+                onSerialize.apply(this, arguments);
+            }
+            
+            // Add the namespaced key to the serialized data
+            const keyWidget = this.widgets.find(w => w.name === "key");
+            if (keyWidget && keyWidget.value && keyWidget.value.trim() !== "") {
+                info.namespacedKey = workflowManager.getNamespacedKey(keyWidget.value);
+            }
+        };
+        
+        // Modify the configure method to restore the namespaced key
+        const onConfigure = nodeType.prototype.onConfigure;
+        nodeType.prototype.onConfigure = function(info) {
+            if (onConfigure) {
+                onConfigure.apply(this, arguments);
+            }
+            
+            // Restore the namespaced key from the serialized data
+            if (info.namespacedKey) {
+                this.properties.namespacedKey = info.namespacedKey;
+            } else {
+                const keyWidget = this.widgets.find(w => w.name === "key");
+                if (keyWidget && keyWidget.value && keyWidget.value.trim() !== "") {
+                    this.properties.namespacedKey = workflowManager.getNamespacedKey(keyWidget.value);
+                }
+            }
         };
     }
 });
@@ -405,5 +630,97 @@ app.registerExtension({
                 };
             }
         };
+    }
+});
+
+// Initialize workflow ID when graph is loaded or created
+app.registerExtension({
+    name: "RealtimeNodesWorkflowID",
+    async setup() {
+        // Initialize workflow ID on startup
+        workflowManager.getWorkflowId();
+        
+        // Helper function to update workflow_id in all state nodes
+        const updateWorkflowIdInNodes = () => {
+            const workflowId = workflowManager.getWorkflowId();
+            
+            // Update all SetStateNodes
+            app.graph._nodes.forEach(node => {
+                if (node.type === "SetStateNode" || node.type === "GetStateNode") {
+                    const workflowIdWidget = node.widgets.find(w => w.name === "workflow_id");
+                    if (workflowIdWidget) {
+                        workflowIdWidget.value = workflowId;
+                        disableWidget(workflowIdWidget);
+                    } else {
+                        // Add the widget if it doesn't exist
+                        const newWidget = node.addWidget("text", "workflow_id", workflowId, () => {}, {
+                            serialize: false,
+                            disabled: true
+                        });
+                        newWidget.hidden = true;
+                        disableWidget(newWidget);
+                    }
+                }
+            });
+        };
+        
+        // Register graph observer to update nodes when graph changes
+        app.graph.onNodeAdded = function(node) {
+            if (node.type === "SetStateNode" || node.type === "GetStateNode") {
+                // Let the node creation process complete first
+                setTimeout(() => {
+                    const workflowId = workflowManager.getWorkflowId();
+                    const workflowIdWidget = node.widgets.find(w => w.name === "workflow_id");
+                    if (workflowIdWidget) {
+                        workflowIdWidget.value = workflowId;
+                        disableWidget(workflowIdWidget);
+                    }
+                }, 50);
+            }
+        };
+        
+        // Hook into graph serialization to ensure workflow ID is set
+        const originalGraphToJSON = app.graph.toJSON;
+        app.graph.toJSON = function(data) {
+            // Ensure workflow ID is up to date before serialization
+            updateWorkflowIdInNodes();
+            
+            // Call original method
+            return originalGraphToJSON.call(this, data);
+        };
+    },
+    async beforeClearGraph() {
+        // Generate a new ID when graph is cleared
+        if (app.graph.extra && app.graph.extra.realtimeNodesState) {
+            // Generate a new workflow ID for the new graph
+            const newId = `wf_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+            app.graph.extra.realtimeNodesState.workflowId = newId;
+        }
+    },
+    async graphLoaded() {
+        // Make sure the workflow ID is established
+        // Use a small delay to ensure the graph is fully loaded
+        setTimeout(() => {
+            const workflowId = workflowManager.getWorkflowId();
+            
+            // Update all state nodes with the current workflow ID
+            app.graph._nodes.forEach(node => {
+                if (node.type === "SetStateNode" || node.type === "GetStateNode") {
+                    // Find or add the workflow_id widget
+                    let workflowIdWidget = node.widgets.find(w => w.name === "workflow_id");
+                    if (workflowIdWidget) {
+                        workflowIdWidget.value = workflowId;
+                    } else {
+                        // Add the widget if it doesn't exist
+                        const newWidget = node.addWidget("text", "workflow_id", workflowId, () => {}, {
+                            serialize: false,
+                            disabled: true
+                        });
+                        newWidget.hidden = true;
+                        disableWidget(newWidget);
+                    }
+                }
+            });
+        }, 100);
     }
 }); 
