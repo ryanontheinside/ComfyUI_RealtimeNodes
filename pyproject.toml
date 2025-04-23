@@ -1,7 +1,9 @@
 [project]
 name = "comfyui_realtimenodes"
 description = "These nodes are for real-time applications of ComfyUI."
+
 version = "1.3.0"
+
 license = {file = "LICENSE"}
 dependencies = ["opencv-python"]
 
