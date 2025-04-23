@@ -4,7 +4,8 @@ A growing suite of nodes for real-time ComfyUI workflows. Features include value
 
 The intention for this repository is to build a suite of nodes that can be used in the burgeoning real-time diffusion space. Contributions are welcome!
 
-## Nodes
+
+## Control Nodes
 
 ### Value Controls 🎚️
 - **FloatControl**: Outputs a floating point value that changes over time using various patterns (sine wave, bounce, random walk, etc).
@@ -27,17 +28,11 @@ The intention for this repository is to build a suite of nodes that can be used 
 - **DTypeConverter**: Convert masks between different data types (float16, uint8, float32, float64).
 - **FastWebcamCapture**: High-performance webcam capture node with resizing capabilities.
 - **SimilarityFilter**: Filter out similar consecutive images and control downstream execution. Perfect for optimizing real-time workflows by skipping redundant processing of similar frames.
+
+### Logic 🧠
 - **LazyCondition**: Powerful conditional execution node that supports any input type. Uses lazy evaluation to truly skip execution of unused paths and maintains state to avoid feedback loops.
 
-## Movement Patterns 🔄
 
-All value and motion controls support various movement patterns:
-- **Sine**: Smooth sinusoidal motion
-- **Triangle**: Linear interpolation with smooth direction changes
-- **Sawtooth**: Linear interpolation with sharp resets
-- **Square**: Instant transitions between min/max values
-- **Static**: No movement (constant value)
-- **and more**
 
 ## Usage 📖
 
@@ -64,6 +59,74 @@ Use utility nodes to optimize and control your workflow:
 - **FPS Monitor**: Monitor performance with a visual overlay
 - **SimilarityFilter**: Skip processing of similar frames by comparing consecutive images. Great for optimizing real-time workflows by only processing frames that have meaningful changes.
 - **LazyCondition**: Create conditional execution paths that truly skip processing of unused branches. Works with any input type (images, latents, text, numbers) and maintains state of the last successful output to avoid feedback loops.
+
+## 🔮 MediaPipe Vision
+
+### ✨ Overview
+
+This repository provides a complete implementation of Google MediaPipe vision tasks for ComfyUI. It enables computer vision capabilities that can be used for interactive AI art, responsive interfaces, motion tracking, and advanced masking workflows.
+
+### 🚀 Features
+
+| Category | Available Tools |
+|----------|-------------|
+| **Face Analysis** | Face detection, face mesh (478 points), blendshapes, head pose |
+| **Body Tracking** | Pose estimation (33 landmarks), segmentation masks |
+| **Hand Analysis** | Hand tracking (21 landmarks per hand), gesture recognition |
+| **Image Processing** | Object detection, image segmentation, image embeddings |
+| **Creative Tools** | Face stylization, interactive segmentation |
+
+### 📋 Supported MediaPipe Tasks
+
+* **Face Detection:** Face bounding boxes and keypoints
+* **Face Landmark Detection:** Face mesh landmarks with expression analysis
+* **Hand Landmark Detection:** Hand position tracking with 21 landmarks
+* **Pose Landmark Detection:** Body pose tracking with 33 landmarks
+* **Object Detection:** Common object detection using models like EfficientDet
+* **Image Segmentation:** Category-based image segmentation
+* **Gesture Recognition:** Recognition of common hand gestures
+* **Image Embedding:** Feature vector generation for image similarity
+* **Interactive Segmentation:** User-guided image masking
+* **Face Stylization:** Artistic style application to faces
+* **Holistic Landmark Detection:** Full-body landmark detection (legacy)
+
+> **Note:** Holistic landmark detection uses the legacy MediaPipe API as we await the official Tasks API release.
+
+### ⚙️ Landmark System
+
+The project's landmark system allows extracting and using position data:
+
+#### Position Extraction
+
+**Landmark Position Extractors** access coordinate data from any landmark:
+- Extract x, y, z positions from face, hand, or pose landmarks
+- Access visibility and presence information where available
+- Access world coordinates when available (hand and pose)
+- Input landmark indices directly to access any point
+- Process batches for multi-frame workflows
+
+#### Position Processing
+
+Several node types work with landmark position data:
+
+- **Delta Controls** - Track movement and map changes to parameter values
+- **Proximity Nodes** - Calculate distances between landmarks
+- **Masking Nodes** - Generate masks centered at landmark positions
+- **Head Pose Extraction** - Calculate yaw, pitch, roll from face landmarks
+- **Blendshape Analysis** - Extract facial expression parameters
+
+### Example Workflow
+
+```
+Load Face Landmarker → Face Landmarker ← Image Input
+           |
+           ↓ landmarks
+Face Landmark Position (Index: 1) → x,y,z coordinates
+           |
+           ↓ x,y,z
+Position Delta Float Control → value → ComfyUI Parameter
+```
+
 
 ## Examples 🎬
 
@@ -97,6 +160,7 @@ git clone https://github.com/ryanontheinside/ComfyUI_RealTimeNodes
 cd ComfyUI_RealTimeNodes
 pip install -r requirements.txt
 ```
+> **Note:** For MediaPipe, GPU Support varies by platform. For Linux, see [these instructions](https://ai.google.dev/edge/mediapipe/framework/getting_started/gpu_support).
 
 ## Coming Soon 🚀
 
@@ -116,19 +180,37 @@ This is an evolving project that aims to expand the real-time capabilities of Co
 
 ### Contributing 🤝
 
-Your feedback and contributions are more than welcome! This project grows stronger with community input.
+This project provides flexible infrastructure for computer vision in ComfyUI. If you have ideas for:
 
-- Have an idea? Open an issue! 💡
-- Found a bug? Open an issue! 🐛
-- Made an improvement? Submit a PR! 🎉
-- Want to help? Join the discussion! 💬
+- Creative AI interactions using vision
+- Specific landmark tracking or detection needs
+- Real-time vision workflows
+- Improvements to the current implementation
+
+Please open an issue, even if you're not sure how to implement it. 
+
+The aim is to **iterate quickly** to keep up with this burgeoning field of real-time ComfyUI 
+
 
 Please visit our [GitHub Issues](https://github.com/ryanontheinside/ComfyUI_RealTimeNodes/issues) page to contribute.
 
 ## Related Projects 🔗
 
-### ComfyUI_RyanOnTheInside - Everything Reactivity ⚡
-Make anything react to anything in your ComfyUI workflows. [ComfyUI_RyanOnTheInside](https://github.com/ryanontheinside/ComfyUI_RyanOnTheInside) - my main custom nodes suite that brings complete reactive control to standard ComfyUI workflows:
+## 🔗 Related Projects
+
+### [ComfyUI_ControlFreak](https://github.com/ryanontheinside/ComfyUI_ControlFreak)
+Universal MIDI & Gamepad Mapping in ComfyUI. Map any MIDI controller or gamepad to any parameter in your ComfyUI workflow for intuitive, hands-on control of your generative art. Perfect for live performances, interactive installations, and streamlined creative workflows.
+
+### [comfystream](https://github.com/yondonfu/comfystream)
+A real-time streaming framework for ComfyUI that enables running workflows continuously on video streams, perfect for 
+combining with MediaPipe vision capabilities.
+
+### [ComfyUI-Stream-Pack](https://github.com/livepeer/ComfyUI-Stream-Pack)
+A collection of ComfyUI nodes for multimedia streaming applications. Combines video processing with generative models 
+for real-time media effects.
+
+### [ComfyUI_RyanOnTheInside](https://github.com/ryanontheinside/ComfyUI_RyanOnTheInside) - Everything Reactivity ⚡
+Make anything react to anything in your ComfyUI workflows.  - my main custom nodes suite that brings complete reactive control to standard ComfyUI workflows:
 
 - Dynamic node relationships
 - React to audio, MIDI, motion, time, depth, color, Whisper, and more
@@ -144,3 +226,4 @@ Make anything react to anything in your ComfyUI workflows. [ComfyUI_RyanOnTheIns
 - Actually more
 
 Use it alongside these Control Nodes to master parameter control in both the batch and real-time paradigms in ComfyUI! The POWER!!
+

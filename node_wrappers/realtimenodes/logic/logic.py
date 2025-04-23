@@ -28,7 +28,7 @@ class LazyCondition(ControlNodeBase):
     
     RETURN_TYPES = (AlwaysEqualProxy("*"),)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/utility"
+    CATEGORY = "Realtime Nodes/control/utility"
 
     def check_lazy_status(self, condition, if_true, fallback, use_fallback):
         """Only evaluate the if_true path if condition is truthy."""
@@ -84,7 +84,7 @@ class LogicOperator(ControlNodeBase):
     
     RETURN_TYPES = ("BOOLEAN",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/logic"
+    CATEGORY = "Realtime Nodes/control/logic"
 
     def update(self, operation, input_a, always_execute=True, input_b=None):
         """Perform the selected logical operation on inputs based on their truthiness."""

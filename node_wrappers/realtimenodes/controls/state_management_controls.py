@@ -20,7 +20,7 @@ class StateResetNode(ControlNodeBase):
 
     RETURN_TYPES = ("BOOLEAN",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/utility"
+    CATEGORY = "Realtime Nodes/control/utility"
 
     def update(self, trigger, always_execute=True):
         if trigger:
@@ -47,7 +47,7 @@ class StateTestNode(ControlNodeBase):
 
     RETURN_TYPES = ("INT",)
     FUNCTION = "update"
-    CATEGORY = "real-time/control/utility"
+    CATEGORY = "Realtime Nodes/control/utility"
 
     def update(self, increment, always_execute=True):
         state = self.get_state({

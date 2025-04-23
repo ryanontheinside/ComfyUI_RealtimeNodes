@@ -40,7 +40,7 @@ class ROINode(ControlNodeBase):
 
     RETURN_TYPES = ("ROI",)
     FUNCTION = "define_roi"
-    CATEGORY = "real-time/control/motion"
+    CATEGORY = "Realtime Nodes/control/motion"
 
     def define_roi(self, mask, action, value, next_roi=None):
         # Convert mask to numpy for bounding box calculation
@@ -100,7 +100,7 @@ class MotionController(ControlNodeBase):
 
     RETURN_TYPES = ("FLOAT", "MASK")
     FUNCTION = "process_motion"
-    CATEGORY = "real-time/control/motion"
+    CATEGORY = "Realtime Nodes/control/motion"
 
     def process_motion(self, image, roi_chain, threshold, blur_size, 
                       minimum_value, maximum_value, starting_value, always_execute=True):
@@ -252,7 +252,7 @@ class IntegerMotionController(MotionController):
 
     RETURN_TYPES = ("INT", "MASK")
     FUNCTION = "process_motion"
-    CATEGORY = "real-time/control/motion"
+    CATEGORY = "Realtime Nodes/control/motion"
 
     def _apply_rounding(self, value, mode):
         """Apply the specified rounding mode to convert float to int"""
