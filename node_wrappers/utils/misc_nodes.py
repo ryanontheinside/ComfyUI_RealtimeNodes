@@ -1011,3 +1011,78 @@ class FeedbackEffect:
         
         return result
     
+class ToString:
+    """A node that converts any input to a string."""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "any": (AlwaysEqualProxy("*"),{}),  # Accept any input type
+                "format_string": ("STRING", {
+                    "default": "{}",
+                    "multiline": False,
+                    "tooltip": "Optional format string (e.g., '{:.2f}' for 2 decimal place float)"
+                })
+            },
+            "optional": {
+                "prepend": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Text to add before the converted string"
+                }),
+                "append": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Text to add after the converted string"
+                })
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "to_string"
+    CATEGORY = "utils"
+    
+    def to_string(self, any, format_string="{}", prepend="", append=""):
+        try:
+            # Try to use the format string if provided
+            result = format_string.format(any)
+        except (ValueError, TypeError):
+            # Fall back to simple string conversion if format fails
+            result = str(any)
+        
+        # Add prepend and append text
+        result = prepend + result + append
+            
+        return (result,)
+
+class RoundNode:
+    """A node that rounds a float to a specified number of decimal places."""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": ("FLOAT", {
+                    "default": 0.0,
+                    "tooltip": "Float value to round"
+                }),
+                "decimal_places": ("INT", {
+                    "default": 2,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "Number of decimal places to round to"
+                })
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT",)
+    RETURN_NAMES = ("rounded_value",)
+    FUNCTION = "round_value"
+    CATEGORY = "utils"
+    
+    def round_value(self, value, decimal_places):
+        rounded = [round(v, decimal_places) for v in value]
+        return (rounded,)
+    
