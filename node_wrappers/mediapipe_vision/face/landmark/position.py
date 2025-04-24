@@ -1,5 +1,5 @@
 import logging
-from ...common.universal_landmark_nodes import LandmarkPositionBaseNode
+from ...location_landmark.universal_landmark_nodes import LandmarkPositionBaseNode
 # Import the landmark definitions
 from .....src.mediapipe_vision.landmark_definitions import FACE_LANDMARK_TOOLTIP
 

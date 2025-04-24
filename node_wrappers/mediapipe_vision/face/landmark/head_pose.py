@@ -6,7 +6,7 @@ from typing import Optional, List, Any, Tuple, Dict
 
 from .....src.mediapipe_vision.types import TRANSFORM_MATRIX_LIST
 from .....src.mediapipe_vision.utils.delta_utils import scale_value
-from ...common.universal_landmark_nodes import FLOAT_EQUALITY_TOLERANCE # For trigger node comparisons
+from ...location_landmark.universal_landmark_nodes import FLOAT_EQUALITY_TOLERANCE # For trigger node comparisons
 
 logger = logging.getLogger(__name__)
 

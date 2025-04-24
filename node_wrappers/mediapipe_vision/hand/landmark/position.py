@@ -3,7 +3,7 @@ import logging
 from typing import List, Tuple, Any, Optional
 
 # Import the base class
-from ...common.universal_landmark_nodes import LandmarkPositionBaseNode
+from ...location_landmark.universal_landmark_nodes import LandmarkPositionBaseNode
 # Import the specific landmark type for clarity and potential future use
 from .....src.mediapipe_vision.types import HAND_LANDMARKS
 # Import the landmark definitions
