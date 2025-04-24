@@ -1,5 +1,7 @@
 import logging
 from ...common.universal_landmark_nodes import LandmarkPositionBaseNode
+# Import the landmark definitions
+from .....src.mediapipe_vision.landmark_definitions import FACE_LANDMARK_TOOLTIP
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ class FaceLandmarkPositionNode(LandmarkPositionBaseNode):
         return {
             "required": {
                 "landmarks": (cls.LANDMARKS_TYPE, {"forceInput": True}), # Use the class variable
-                "landmark_index": ("INT", {"default": 0, "min": 0}),
+                "landmark_index": ("INT", {"default": 0, "min": 0, "tooltip": FACE_LANDMARK_TOOLTIP}),
             }
         }
 

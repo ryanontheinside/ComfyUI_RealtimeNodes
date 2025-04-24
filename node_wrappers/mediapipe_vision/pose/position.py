@@ -5,6 +5,8 @@ from typing import List, Tuple, Any, Optional
 from ..common.universal_landmark_nodes import LandmarkPositionBaseNode
 # Import the specific landmark type for clarity and potential future use
 from ....src.mediapipe_vision.types import POSE_LANDMARKS
+# Import the landmark definitions
+from ....src.mediapipe_vision.landmark_definitions import POSE_LANDMARK_TOOLTIP
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Pose/PoseLandmark/Position"
@@ -23,7 +25,7 @@ class PoseLandmarkPositionNode(LandmarkPositionBaseNode):
         return {
             "required": {
                 "landmarks": (cls.LANDMARKS_TYPE, {"forceInput": True}),
-                "landmark_index": ("INT", {"default": 0, "min": 0, "max": 32, "tooltip": "Nose=0, Left Wrist=15, Right Wrist=16"}), # Pose specific default/range
+                "landmark_index": ("INT", {"default": 0, "min": 0, "max": 32, "tooltip": POSE_LANDMARK_TOOLTIP}),
                 "use_world_coordinates": ("BOOLEAN", {"default": False, "tooltip": "Use world coordinates if available"}),
             }
         }
