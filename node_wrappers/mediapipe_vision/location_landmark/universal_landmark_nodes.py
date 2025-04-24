@@ -7,6 +7,8 @@ import cv2
 import collections
 import typing # Add typing for Dict hint
 
+#TODO: consider moving base nodes to src
+
 # Assuming types are correctly imported relative to this file's location
 from ....src.mediapipe_vision.types import (
     FACE_LANDMARKS, HAND_LANDMARKS, POSE_LANDMARKS,
@@ -123,6 +125,10 @@ class LandmarkPositionBaseNode:
             pres_coords.append(current_pres)
             is_valid_list.append(is_valid)
 
+        # Check if each list has only one element, if so return single values instead of lists
+        if len(x_coords) == 1:
+            return (x_coords[0], y_coords[0], z_coords[0], vis_coords[0], pres_coords[0], is_valid_list[0])
+        
         return (x_coords, y_coords, z_coords, vis_coords, pres_coords, is_valid_list)
 
 

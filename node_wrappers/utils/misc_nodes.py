@@ -1083,6 +1083,9 @@ class RoundNode:
     CATEGORY = "utils"
     
     def round_value(self, value, decimal_places):
-        rounded = [round(v, decimal_places) for v in value]
+        if isinstance(value, (list, tuple, np.ndarray, torch.Tensor)):
+            rounded = [round(v, decimal_places) for v in value]
+        else:
+            rounded = round(value, decimal_places)
         return (rounded,)
     
