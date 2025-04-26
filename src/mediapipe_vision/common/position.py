@@ -1,23 +1,14 @@
 import logging
-from typing import Optional, List, Any, Tuple, Union
-import math
-import torch
-import numpy as np
-import cv2
-import collections
-import typing # Add typing for Dict hint
+from typing import Optional, List, Tuple
 
 #TODO: consider moving base nodes to src
 
 # Assuming types are correctly imported relative to this file's location
 from ..types import (
-    FACE_LANDMARKS, HAND_LANDMARKS, POSE_LANDMARKS,
-    LandmarkPoint, FaceLandmarksResult, HandLandmarksResult, PoseLandmarksResult
+    LandmarkPoint
 )
 
 # Import from the new consolidated utilities
-from ...utils.math import scale_value
-from ...utils.general import AlwaysEqualProxy
 
 logger = logging.getLogger(__name__)
 
