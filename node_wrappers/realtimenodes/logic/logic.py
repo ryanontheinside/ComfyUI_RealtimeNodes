@@ -1,5 +1,5 @@
-from ....src.utils.general_utils import AlwaysEqualProxy
 from ....src.realtimenodes.control_base import ControlNodeBase
+from ....src.utils.general import AlwaysEqualProxy
 
 class LazyCondition(ControlNodeBase):
     DESCRIPTION = "Uses lazy evaluation to truly skip execution of unused paths. Maintains state of the last value to circumvent feedback loops."
