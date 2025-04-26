@@ -4,6 +4,8 @@ import cv2
 from typing import Union, List, Tuple, Dict, Optional, Any
 import logging
 
+from .coordinate_system import CoordinateSystem
+
 logger = logging.getLogger(__name__)
 
 class DrawingEngine:
@@ -22,20 +24,6 @@ class DrawingEngine:
             return (rgb[2], rgb[1], rgb[0])  # RGB to BGR
         except ValueError:
             return (0, 0, 0)
-
-    @staticmethod
-    def normalize_coords(coords: Union[float, List[float]], dim_size: int) -> Union[float, List[float]]:
-        """Normalize pixel coordinates to 0.0-1.0 range."""
-        if isinstance(coords, list):
-            return [float(c) / dim_size for c in coords]
-        return float(coords) / dim_size
-
-    @staticmethod
-    def denormalize_coords(coords: Union[float, List[float]], dim_size: int) -> Union[float, List[float]]:
-        """Convert normalized coordinates to pixel space."""
-        if isinstance(coords, list):
-            return [float(max(0, min(dim_size - 1, c * dim_size))) for c in coords]
-        return float(max(0, min(dim_size - 1, coords * dim_size)))
 
     @staticmethod
     def prep_batch_image(image: torch.Tensor, batch_idx: int) -> Tuple[np.ndarray, torch.device, torch.dtype]:
@@ -126,8 +114,8 @@ class DrawingEngine:
                     
                 # Convert to pixel coordinates if needed
                 if is_normalized:
-                    px = int(max(0, min(width - 1, xi * width)))
-                    py = int(max(0, min(height - 1, yi * height)))
+                    px = int(CoordinateSystem.denormalize(xi, width, CoordinateSystem.PIXEL))
+                    py = int(CoordinateSystem.denormalize(yi, height, CoordinateSystem.PIXEL))
                 else:
                     px = int(max(0, min(width - 1, xi)))
                     py = int(max(0, min(height - 1, yi)))
@@ -223,10 +211,10 @@ class DrawingEngine:
                     
                 # Convert to pixel coordinates if needed
                 if is_normalized:
-                    px1 = int(max(0, min(width - 1, _x1 * width)))
-                    py1 = int(max(0, min(height - 1, _y1 * height)))
-                    px2 = int(max(0, min(width - 1, _x2 * width)))
-                    py2 = int(max(0, min(height - 1, _y2 * height)))
+                    px1 = int(CoordinateSystem.denormalize(_x1, width, CoordinateSystem.PIXEL))
+                    py1 = int(CoordinateSystem.denormalize(_y1, height, CoordinateSystem.PIXEL))
+                    px2 = int(CoordinateSystem.denormalize(_x2, width, CoordinateSystem.PIXEL))
+                    py2 = int(CoordinateSystem.denormalize(_y2, height, CoordinateSystem.PIXEL))
                 else:
                     px1 = int(max(0, min(width - 1, _x1)))
                     py1 = int(max(0, min(height - 1, _y1)))
@@ -248,15 +236,22 @@ class DrawingEngine:
                         label_y = int((py1 + py2) / 2)
                     elif label_position == "Start":
                         label_x, label_y = px1, py1
-                    else:  # End or fallback
+                    else:  # "End"
                         label_x, label_y = px2, py2
                         
-                    # Add offset and draw text
-                    label_y += 10
-                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    # Get text size
+                    text_size, baseline = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
+                    
+                    # Draw background rectangle
+                    cv2.rectangle(img_np, 
+                                 (label_x - 5, label_y - text_size[1] - 5),
+                                 (label_x + text_size[0] + 5, label_y + 5),
+                                 (50, 50, 50), -1)
+                    
+                    # Draw text
                     cv2.putText(img_np, label_text, (label_x, label_y), 
-                              font, font_scale, bgr_color, 1, cv2.LINE_AA)
-                              
+                               cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), 1)
+            
             # Convert back to tensor and update batch
             output_batch[b] = self.tensor_from_numpy(img_np, device, dtype)
             
@@ -278,22 +273,17 @@ class DrawingEngine:
                     label_position: str = "Center",
                     font_scale: float = 0.5) -> torch.Tensor:
         """
-        Draw polygons on images efficiently.
+        Draw polygon on images efficiently.
         
         Args:
             image: BHWC tensor
-            points_x/y: Lists of polygon vertex coordinates 
+            points_x/y: Lists of polygon vertex coordinates
+            thickness: Line thickness in pixels
             color: Hex color
-            thickness: Line thickness for polygon outline
             fill: Whether to fill the polygon
             is_normalized: If True, coords are 0-1 normalized
             batch_mapping: How to map polygons to batch
-            draw_vertices: Whether to draw points at polygon vertices
-            vertex_radius: Radius of vertex points
-            draw_label: Whether to draw a text label
-            label_text: Text to display
-            label_position: Position of the label ("Center" only for now)
-            font_scale: Font scale
+            Other params: Styling options
             
         Returns:
             Modified image tensor
@@ -302,49 +292,19 @@ class DrawingEngine:
         output_batch = image.clone()
         bgr_color = self.hex_to_bgr(color)
         
-        # Validate input
-        if not isinstance(points_x, list) or not isinstance(points_y, list):
-            logger.error("Polygon requires lists of points")
-            return output_batch
-            
+        # Validate input lengths
         if len(points_x) != len(points_y):
-            logger.error("points_x and points_y must have the same length")
-            return output_batch
+            raise ValueError("X and Y coordinate lists must have the same length")
             
+        # Ensure lists have at least 3 points for a polygon
         if len(points_x) < 3:
-            logger.error("Polygon requires at least 3 points")
+            logger.warning("Polygon needs at least 3 points. Drawing nothing.")
             return output_batch
-            
-        # Check if we have a list of polygon point sets or just a single polygon
-        is_multi_polygon = False
-        if isinstance(points_x[0], list):
-            is_multi_polygon = True
-            if not all(isinstance(p, list) for p in points_x + points_y):
-                logger.error("If providing multiple polygons, all entries in points_x/y must be lists")
-                return output_batch
-            if len(points_x) != len(points_y):
-                logger.error("For multiple polygons, points_x and points_y lists must have the same length")
-                return output_batch
-                
-            poly_count = len(points_x)
-            # Validate each polygon has matching x,y counts
-            for i in range(poly_count):
-                if len(points_x[i]) != len(points_y[i]):
-                    logger.error(f"Polygon {i}: points_x and points_y must have the same length")
-                    return output_batch
-                if len(points_x[i]) < 3:
-                    logger.error(f"Polygon {i} requires at least 3 points")
-                    return output_batch
-        else:
-            # Single polygon case - wrap in outer list for consistent processing
-            points_x = [points_x]
-            points_y = [points_y]
-            poly_count = 1
             
         # Determine batch mapping
-        if batch_mapping == "one-to-one" and poly_count != batch_size and poly_count != 1:
-            logger.warning(f"One-to-one mapping requested but polygon count ({poly_count}) != batch size ({batch_size})")
-            batch_mapping = "all-on-first"
+        if batch_mapping == "one-to-one" and batch_size > 1:
+            logger.warning(f"One-to-one mapping not supported for polygons. Using broadcast.")
+            batch_mapping = "broadcast"
             
         # Process each image in batch
         for b in range(batch_size):
@@ -352,72 +312,64 @@ class DrawingEngine:
             if batch_mapping == "all-on-first" and b > 0:
                 continue
                 
-            # Get polygons for this batch item
-            if batch_mapping == "one-to-one" and poly_count == batch_size:
-                poly_indices = [b]
-            elif batch_mapping == "broadcast" or (batch_mapping == "one-to-one" and poly_count == 1):
-                poly_indices = range(poly_count)
-            else:  # "all-on-first"
-                poly_indices = range(poly_count)
-                
-            # Skip if no polygons to draw
-            if not poly_indices:
-                continue
-                
             # Single efficient conversion to numpy
             img_np, device, dtype = self.prep_batch_image(output_batch, b)
             
-            # Draw all polygons for this image
-            for i in poly_indices:
-                px = points_x[i]
-                py = points_y[i]
+            # Convert polygon points to pixel coordinates
+            pixel_points = []
+            for i in range(len(points_x)):
+                x_coord = points_x[i]
+                y_coord = points_y[i]
                 
+                if not isinstance(x_coord, (float, int)) or not isinstance(y_coord, (float, int)):
+                    continue
+                    
                 # Convert to pixel coordinates if needed
                 if is_normalized:
-                    # Vectorized conversion
-                    px_pixels = [int(max(0, min(width - 1, x * width))) for x in px]
-                    py_pixels = [int(max(0, min(height - 1, y * height))) for y in py]
+                    px = int(CoordinateSystem.denormalize(x_coord, width, CoordinateSystem.PIXEL))
+                    py = int(CoordinateSystem.denormalize(y_coord, height, CoordinateSystem.PIXEL))
                 else:
-                    # Ensure within bounds
-                    px_pixels = [int(max(0, min(width - 1, x))) for x in px]
-                    py_pixels = [int(max(0, min(height - 1, y))) for y in py]
-                
-                # Combine x,y into points format needed by OpenCV
-                points = np.array(list(zip(px_pixels, py_pixels)), np.int32)
-                points = points.reshape((-1, 1, 2))
-                
-                # Draw filled polygon
-                if fill:
-                    cv2.fillPoly(img_np, [points], bgr_color)
-                
-                # Draw polygon outline
-                cv2.polylines(img_np, [points], True, bgr_color, thickness)
+                    px = int(max(0, min(width - 1, x_coord)))
+                    py = int(max(0, min(height - 1, y_coord)))
+                    
+                pixel_points.append((px, py))
                 
                 # Draw vertices if requested
                 if draw_vertices:
-                    for vx, vy in zip(px_pixels, py_pixels):
-                        cv2.circle(img_np, (vx, vy), vertex_radius, bgr_color, -1)
+                    cv2.circle(img_np, (px, py), vertex_radius, bgr_color, -1)
+            
+            # Skip if no valid points
+            if len(pixel_points) < 3:
+                continue
                 
-                # Draw label if requested
-                if draw_label and label_text:
-                    # Calculate centroid for label position
-                    centroid_x = sum(px_pixels) // len(px_pixels)
-                    centroid_y = sum(py_pixels) // len(py_pixels)
-                    
-                    # Add offset and draw text with outline for better visibility
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    text_size = cv2.getTextSize(label_text, font, font_scale, 1)[0]
-                    
-                    # Center text
-                    text_x = max(0, min(width - text_size[0], centroid_x - text_size[0] // 2))
-                    text_y = centroid_y
-                    
-                    # Draw text outline/shadow for better visibility
-                    cv2.putText(img_np, label_text, (text_x, text_y), 
-                              font, font_scale, (0, 0, 0), 2, cv2.LINE_AA)  # Thicker black outline
-                    # Draw main text
-                    cv2.putText(img_np, label_text, (text_x, text_y), 
-                              font, font_scale, bgr_color, 1, cv2.LINE_AA)
+            # Convert to numpy array for OpenCV
+            pts = np.array(pixel_points, dtype=np.int32)
+            
+            # Draw filled or outline polygon
+            if fill:
+                cv2.fillPoly(img_np, [pts], bgr_color)
+            else:
+                cv2.polylines(img_np, [pts], True, bgr_color, thickness)
+                
+            # Draw label if requested
+            if draw_label and label_text:
+                # Calculate label position (center of polygon)
+                center_x = int(sum(p[0] for p in pixel_points) / len(pixel_points))
+                center_y = int(sum(p[1] for p in pixel_points) / len(pixel_points))
+                
+                # Get text size
+                text_size, baseline = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
+                
+                # Draw background rectangle
+                cv2.rectangle(img_np, 
+                             (center_x - text_size[0]//2 - 5, center_y - text_size[1]//2 - 5),
+                             (center_x + text_size[0]//2 + 5, center_y + text_size[1]//2 + 5),
+                             (50, 50, 50), -1)
+                
+                # Draw text
+                cv2.putText(img_np, label_text, 
+                           (center_x - text_size[0]//2, center_y + text_size[1]//2), 
+                           cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), 1)
             
             # Convert back to tensor and update batch
             output_batch[b] = self.tensor_from_numpy(img_np, device, dtype)
