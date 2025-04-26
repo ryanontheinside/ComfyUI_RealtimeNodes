@@ -26,6 +26,7 @@ class PoseLandmarkPositionNode(LandmarkPositionBaseNode):
             "required": {
                 "landmarks": (cls.LANDMARKS_TYPE, {"forceInput": True}),
                 "landmark_index": ("INT", {"default": 0, "min": 0, "max": 32, "tooltip": POSE_LANDMARK_TOOLTIP}),
+                "result_index": ("INT", {"default": 0, "min": 0, "tooltip": "Index of the pose detection to use (0=first detected pose)"}),
                 "use_world_coordinates": ("BOOLEAN", {"default": False, "tooltip": "Use world coordinates if available"}),
             }
         }

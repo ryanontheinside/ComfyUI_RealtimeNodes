@@ -27,6 +27,7 @@ class HandLandmarkPositionNode(LandmarkPositionBaseNode):
             "required": {
                 "landmarks": (cls.LANDMARKS_TYPE, {"forceInput": True}),
                 "landmark_index": ("INT", {"default": 8, "min": 0, "max": 20, "tooltip": HAND_LANDMARK_TOOLTIP}),
+                "result_index": ("INT", {"default": 0, "min": 0, "tooltip": "Index of the hand detection to use (0=first detected hand)"}),
                 "use_world_coordinates": ("BOOLEAN", {"default": False, "tooltip": "Use world coordinates if available"}),
             }
         }

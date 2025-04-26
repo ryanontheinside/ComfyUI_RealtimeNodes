@@ -22,6 +22,7 @@ class FaceLandmarkPositionNode(LandmarkPositionBaseNode):
             "required": {
                 "landmarks": (cls.LANDMARKS_TYPE, {"forceInput": True}), # Use the class variable
                 "landmark_index": ("INT", {"default": 0, "min": 0, "tooltip": FACE_LANDMARK_TOOLTIP}),
+                "result_index": ("INT", {"default": 0, "min": 0, "tooltip": "Index of the face detection to use (0=first detected face)"}),
             }
         }
 
