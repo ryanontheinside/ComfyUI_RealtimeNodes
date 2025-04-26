@@ -1,13 +1,17 @@
+from typing import Dict, List, Optional, Tuple
+
 import mediapipe as mp
 import numpy as np
 import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
-from typing import List, Tuple, Optional, Dict
+
+from ...utils.timing import TimestampProvider  # Import TimestampProvider
+
 # Import new types
 from ..types import LandmarkPoint
-from ...utils.timing import TimestampProvider # Import TimestampProvider
+
 
 class FaceLandmarkDetector:
     """Detects face landmarks and blendshapes using MediaPipe FaceLandmarker."""

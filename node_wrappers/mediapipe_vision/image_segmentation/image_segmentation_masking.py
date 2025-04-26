@@ -1,6 +1,6 @@
-import torch
 import logging
 
+import torch
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/ImageSegmentation/Masking"

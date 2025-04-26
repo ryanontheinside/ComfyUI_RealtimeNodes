@@ -1,10 +1,11 @@
 """Utilities for downloading MediaPipe models."""
 
-import os
-import requests
 import logging
+import os
+from typing import Any, Dict, Optional, Tuple
+
+import requests
 from tqdm import tqdm
-from typing import Dict, Optional, Any, Tuple
 
 from .model_utils import MEDIAPIPE_MODELS, get_model_path
 

@@ -9,7 +9,11 @@ from .general import AlwaysEqualProxy
 from .image import convert_to_cv2, convert_to_tensor, create_mask_from_points
 
 # Math utilities
-from .math import scale_value, calculate_euclidean_distance, calculate_euclidean_distance_2d
+from .math import (
+    calculate_euclidean_distance,
+    calculate_euclidean_distance_2d,
+    scale_value,
+)
 
 # Timing utilities
 from .timing import TimestampProvider

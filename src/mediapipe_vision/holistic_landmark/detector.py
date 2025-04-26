@@ -4,15 +4,18 @@ This implementation specifically handles the MediaPipe Holistic solution
 which is currently only available through the legacy API, not the Task API.
 """
 
+from typing import Any, List, Optional, Tuple
+
+import cv2
 import mediapipe as mp
 import numpy as np
 import torch
-import cv2
-from typing import List, Tuple, Optional, Any
+
+from ...utils.timing import TimestampProvider
 
 # Import needed types
-from ..types import LandmarkPoint, HolisticLandmarksResult
-from ...utils.timing import TimestampProvider
+from ..types import HolisticLandmarksResult, LandmarkPoint
+
 
 class HolisticLandmarkDetector:
     """Detects holistic landmarks combining face, pose and hand tracking.

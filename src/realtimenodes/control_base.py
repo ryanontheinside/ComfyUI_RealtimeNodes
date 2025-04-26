@@ -1,5 +1,6 @@
-from abc import ABC, abstractmethod
 import time
+from abc import ABC, abstractmethod
+
 
 class Pattern(ABC):
     """Base class for all patterns (movement, timing, etc)"""

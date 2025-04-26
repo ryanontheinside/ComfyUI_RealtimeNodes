@@ -1,4 +1,5 @@
 import logging
+
 from .....src.mediapipe_vision.common.position import LandmarkPositionBase
 from .....src.mediapipe_vision.landmark_definitions import FACE_LANDMARK_TOOLTIP
 

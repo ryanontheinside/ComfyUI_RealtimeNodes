@@ -1,7 +1,8 @@
 import logging
 
 # Import the base class
-from ....src.mediapipe_vision.common.position import LandmarkPositionBase 
+from ....src.mediapipe_vision.common.position import LandmarkPositionBase
+
 # Import the specific landmark type for clarity and potential future use
 # Import the landmark definitions
 from ....src.mediapipe_vision.landmark_definitions import POSE_LANDMARK_TOOLTIP

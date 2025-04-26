@@ -1,11 +1,15 @@
-import torch
-import logging
 import json
+import logging
+
+import torch
+
+from ....src.mediapipe_vision.interactive_segmentation.detector import (
+    InteractiveSegmenterProcessor,
+)
+from ....src.mediapipe_vision.  types import PointOfInterest
 
 # Import Base Loader and Detector
 from ..common.model_loader import MediaPipeModelLoaderBaseNode
-from ....src.mediapipe_vision.interactive_segmentation.detector import InteractiveSegmenterProcessor
-from ....src.mediapipe_vision.  types import PointOfInterest
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/InteractiveSegmentation"

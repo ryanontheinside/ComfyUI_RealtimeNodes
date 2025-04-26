@@ -1,8 +1,8 @@
-import logging
-from typing import Optional
-import math
 import collections
-import typing # Add typing for Dict hint
+import logging
+import math
+import typing  # Add typing for Dict hint
+from typing import Optional
 
 #TODO: consider moving base nodes to src
 

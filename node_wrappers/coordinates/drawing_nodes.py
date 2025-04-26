@@ -1,9 +1,9 @@
-import torch
 import logging
-from typing import Union, List
+from typing import List, Union
 
-from ...src.coordinates import CoordinateSystem
-from ...src.coordinates import DrawingEngine
+import torch
+
+from ...src.coordinates import CoordinateSystem, DrawingEngine
 
 logger = logging.getLogger(__name__)
 

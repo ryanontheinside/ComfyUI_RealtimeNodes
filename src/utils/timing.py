@@ -4,6 +4,7 @@ Timing and timestamp utilities for RealTimeNodes.
 
 import time
 
+
 class TimestampProvider:
     """
     Provides real-time, monotonic timestamps in milliseconds.

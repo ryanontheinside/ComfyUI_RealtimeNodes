@@ -1,11 +1,14 @@
 """Node wrapper for face detection."""
 
+import logging
+
 import torch
+
 from .....src.mediapipe_vision.face_landmark.detector import FaceLandmarkDetector
+from ...common.base_detector_node import BaseMediaPipeDetectorNode
+
 # Import Base Classes
 from ...common.model_loader import MediaPipeModelLoaderBaseNode
-from ...common.base_detector_node import BaseMediaPipeDetectorNode
-import logging
 
 logger = logging.getLogger(__name__)
 

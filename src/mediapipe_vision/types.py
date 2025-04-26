@@ -1,5 +1,7 @@
-from typing import List, Optional, NamedTuple
-import numpy as np # Added numpy for matrix type
+from typing import List, NamedTuple, Optional
+
+import numpy as np  # Added numpy for matrix type
+
 
 # Define a structure for a single landmark point
 class LandmarkPoint(NamedTuple):

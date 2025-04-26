@@ -1,10 +1,12 @@
 # node_wrappers/pose/masking.py
-import torch
 import logging
 from typing import List
 
+import torch
+
 from ....src.mediapipe_vision.types import PoseLandmarksResult
 from ....src.utils.image import create_mask_from_points
+
 # Removed GetImageDimensionsNode import
 
 logger = logging.getLogger(__name__)

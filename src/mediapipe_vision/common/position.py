@@ -1,12 +1,9 @@
 import logging
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 #TODO: consider moving base nodes to src
-
 # Assuming types are correctly imported relative to this file's location
-from ..types import (
-    LandmarkPoint
-)
+from ..types import LandmarkPoint
 
 # Import from the new consolidated utilities
 

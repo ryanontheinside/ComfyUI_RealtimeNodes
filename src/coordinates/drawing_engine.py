@@ -1,8 +1,9 @@
-import torch
-import numpy as np
-import cv2
-from typing import Union, List, Tuple
 import logging
+from typing import List, Tuple, Union
+
+import cv2
+import numpy as np
+import torch
 
 from .coordinate_system import CoordinateSystem
 

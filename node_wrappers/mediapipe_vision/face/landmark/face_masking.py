@@ -1,10 +1,11 @@
 # node_wrappers/face/masking.py
-import torch
 import logging
 from typing import List
 
+import torch
+
 from .....src.mediapipe_vision.types import LandmarkPoint
-from .....src.utils.image import create_mask_from_points 
+from .....src.utils.image import create_mask_from_points
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Face/FaceLandmark/Masking"

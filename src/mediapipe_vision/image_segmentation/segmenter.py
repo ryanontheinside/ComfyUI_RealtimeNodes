@@ -3,14 +3,16 @@
 This module contains the implementation of MediaPipe Image Segmentation functionality.
 """
 
+import logging
+import platform  # Needed for OS check
+
 import mediapipe as mp
 import numpy as np
 import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.vision import ImageSegmenter
-import platform # Needed for OS check
-import logging
+
 from ...utils.timing import TimestampProvider
 
 logger = logging.getLogger(__name__)

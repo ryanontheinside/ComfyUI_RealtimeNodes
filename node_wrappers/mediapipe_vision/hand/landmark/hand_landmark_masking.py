@@ -1,9 +1,11 @@
 # node_wrappers/hand/masking.py
-import torch
 import logging
-from typing import List 
+from typing import List
+
+import torch
 
 from .....src.mediapipe_vision.types import HandLandmarksResult
+
 # Updated import path
 from .....src.utils.image import create_mask_from_points
 

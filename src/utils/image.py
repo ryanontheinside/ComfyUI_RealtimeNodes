@@ -5,10 +5,12 @@ Contains functions for converting between different image formats,
 particularly between ComfyUI tensor format (BHWC) and OpenCV format.
 """
 
-import torch
-import numpy as np
-import cv2
 from typing import List, Tuple
+
+import cv2
+import numpy as np
+import torch
+
 
 def convert_to_cv2(tensor: torch.Tensor) -> list:
     """Converts a ComfyUI IMAGE tensor (BHWC, float32, 0-1) to a list of cv2 images (BGR, uint8)."""

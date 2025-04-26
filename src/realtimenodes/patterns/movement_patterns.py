@@ -1,6 +1,8 @@
-from ..control_base import Pattern
 import math
 import random
+
+from ..control_base import Pattern
+
 
 class StaticPattern(Pattern):
     def get_name(self) -> str:

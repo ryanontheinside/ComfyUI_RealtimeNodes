@@ -1,9 +1,12 @@
-from ....src.realtimenodes.control_base import ControlNodeBase
+import time
 from enum import Enum
+
+import cv2
 import numpy as np
 import torch
-import cv2
-import time
+
+from ....src.realtimenodes.control_base import ControlNodeBase
+
 
 class ROIAction(Enum):
     # Behavioral actions

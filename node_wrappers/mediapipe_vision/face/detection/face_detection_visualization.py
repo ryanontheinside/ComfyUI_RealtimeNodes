@@ -1,8 +1,10 @@
 # visualize_face_detection.py
+import logging
+
 import cv2
+
 from ...common.base_visualization_nodes import BaseDetectionVisualizationNode
 
-import logging
 logger = logging.getLogger(__name__)
 
 class VisualizeFaceDetections(BaseDetectionVisualizationNode):

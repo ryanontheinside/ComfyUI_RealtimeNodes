@@ -1,7 +1,9 @@
-import torch
 import numpy as np
+import torch
+
 from ....src.realtimenodes.control_base import ControlNodeBase
 from ....src.realtimenodes.mask_controls import MaskControlMixin
+
 
 class RepulsiveMaskNode(ControlNodeBase, MaskControlMixin):
     """Node that maintains a mask that repulses or attracts to input masks"""

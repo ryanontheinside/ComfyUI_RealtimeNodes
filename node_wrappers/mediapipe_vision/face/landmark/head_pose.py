@@ -1,12 +1,15 @@
 # node_wrappers/face/head_pose.py
 import logging
+from typing import Dict, Optional
+
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from typing import Optional, Dict
 
+from .....src.mediapipe_vision.common.position import (
+    FLOAT_EQUALITY_TOLERANCE,  # For trigger node comparisons
+)
 from .....src.mediapipe_vision.types import TRANSFORM_MATRIX_LIST
 from .....src.utils.math import scale_value
-from .....src.mediapipe_vision.common.position import FLOAT_EQUALITY_TOLERANCE # For trigger node comparisons
 
 logger = logging.getLogger(__name__)
 

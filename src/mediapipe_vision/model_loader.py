@@ -3,12 +3,13 @@
 Handles model definition, download, and path retrieval.
 """
 
-import os
 import logging
-import urllib.request
-import folder_paths # ComfyUI path helper
-from typing import Dict, Any, Optional, List
+import os
 import traceback
+import urllib.request
+from typing import Any, Dict, List, Optional
+
+import folder_paths  # ComfyUI path helper
 
 # Configure logging
 # logging.basicConfig(level=logging.INFO) # Avoid reconfiguring root logger

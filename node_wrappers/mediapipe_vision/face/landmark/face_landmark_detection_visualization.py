@@ -1,10 +1,11 @@
 # visualize_face.py
+import logging
+from typing import Any, List, Optional
+
 import mediapipe as mp
-from typing import Optional, List, Any
 
 from ...common.base_visualization_nodes import BaseLandmarkVisualizationNode
 
-import logging
 logger = logging.getLogger(__name__)
 
 # Define standard face connections

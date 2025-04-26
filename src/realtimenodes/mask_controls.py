@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class MaskControlMixin:
     """Mixin providing common mask functionality"""
     def create_circle_mask(self, height, width, center_y, center_x, size):

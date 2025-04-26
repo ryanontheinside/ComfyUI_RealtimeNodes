@@ -1,10 +1,12 @@
-import torch
 import logging
+
+import torch
+
+from ....src.mediapipe_vision.image_embedding.detector import ImageEmbedder
+from ..common.base_detector_node import BaseMediaPipeDetectorNode
 
 # Import Base Loader and Detector
 from ..common.model_loader import MediaPipeModelLoaderBaseNode
-from ..common.base_detector_node import BaseMediaPipeDetectorNode
-from ....src.mediapipe_vision.image_embedding.detector import ImageEmbedder
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/ImageEmbedding"

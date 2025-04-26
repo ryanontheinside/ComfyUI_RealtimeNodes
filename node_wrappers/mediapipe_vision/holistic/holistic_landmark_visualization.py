@@ -1,8 +1,9 @@
 import logging
+from typing import List, Optional, Tuple
+
+import cv2
 import mediapipe as mp
 import numpy as np
-import cv2
-from typing import List, Tuple, Optional
 import torch
 
 logger = logging.getLogger(__name__)

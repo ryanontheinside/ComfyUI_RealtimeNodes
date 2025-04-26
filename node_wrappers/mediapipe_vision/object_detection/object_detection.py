@@ -1,8 +1,10 @@
-import torch
-from ....src.mediapipe_vision.object_detection.detector import ObjectDetector
-from ..common.model_loader import MediaPipeModelLoaderBaseNode
-from ..common.base_detector_node import BaseMediaPipeDetectorNode
 import logging
+
+import torch
+
+from ....src.mediapipe_vision.object_detection.detector import ObjectDetector
+from ..common.base_detector_node import BaseMediaPipeDetectorNode
+from ..common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/ObjectDetection"

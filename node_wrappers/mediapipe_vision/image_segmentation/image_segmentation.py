@@ -1,15 +1,17 @@
 """Node wrapper for image segmentation"""
 
-import torch
-import numpy as np
-import cv2 # For visualization
 import logging
+
+import cv2  # For visualization
+import numpy as np
+import torch
 
 # Imports from this project
 from ....src.mediapipe_vision.image_segmentation.segmenter import ImageSegmenter
-# Import Base Classes
-from ..common.model_loader import MediaPipeModelLoaderBaseNode 
 from ..common.base_detector_node import BaseMediaPipeDetectorNode
+
+# Import Base Classes
+from ..common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 

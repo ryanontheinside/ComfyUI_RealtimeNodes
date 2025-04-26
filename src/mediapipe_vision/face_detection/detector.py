@@ -3,16 +3,20 @@
 This module contains the implementation of MediaPipe Face Detection functionality.
 """
 
+from typing import List
+
 import mediapipe as mp
 import numpy as np
 import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
-from typing import List
+
+from ...utils.timing import TimestampProvider  # Import from utils
+
 # Import new types
-from ..types import FaceDetectionResult, BoundingBox, FaceKeypoint
-from ...utils.timing import TimestampProvider # Import from utils
+from ..types import BoundingBox, FaceDetectionResult, FaceKeypoint
+
 
 class FaceDetector:
     """Detects faces in an image using MediaPipe FaceDetector."""

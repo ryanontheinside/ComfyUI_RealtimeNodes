@@ -8,7 +8,9 @@
 import math
 from typing import Optional
 
-from ..types import LandmarkPoint # Assuming LandmarkPoint is in src/types.py
+from ..types import LandmarkPoint  # Assuming LandmarkPoint is in src/types.py
+
+
 #TODO: refactor to common after unified coordinate system
 def calculate_euclidean_delta(p1: Optional[LandmarkPoint], p2: Optional[LandmarkPoint]) -> Optional[float]:
     """Calculates the Euclidean distance between two LandmarkPoint objects."""

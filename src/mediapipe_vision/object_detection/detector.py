@@ -1,13 +1,17 @@
+from typing import List
+
 import mediapipe as mp
 import numpy as np
 import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
-from typing import List
-# Import new types
-from ..types import ObjectDetectionResult, ObjectDetectionCategory, BoundingBox
+
 from ...utils.timing import TimestampProvider
+
+# Import new types
+from ..types import BoundingBox, ObjectDetectionCategory, ObjectDetectionResult
+
 
 class ObjectDetector:
     """Detects objects using MediaPipe ObjectDetector."""

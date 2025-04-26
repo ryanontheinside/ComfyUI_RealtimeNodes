@@ -1,8 +1,10 @@
-import torch
-from .....src.mediapipe_vision.hand_landmark.detector import HandLandmarkDetector
-from ...common.model_loader import MediaPipeModelLoaderBaseNode
-from ...common.base_detector_node import BaseMediaPipeDetectorNode
 import logging
+
+import torch
+
+from .....src.mediapipe_vision.hand_landmark.detector import HandLandmarkDetector
+from ...common.base_detector_node import BaseMediaPipeDetectorNode
+from ...common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 

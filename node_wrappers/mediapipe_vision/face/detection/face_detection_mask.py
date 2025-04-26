@@ -1,8 +1,9 @@
 # face_detection_mask.py
-import torch
-import numpy as np
 import logging
+
+import numpy as np
 import scipy.ndimage
+import torch
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Face/FaceDetection"

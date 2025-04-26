@@ -1,9 +1,12 @@
-import torch
-import torch.nn.functional as F
 import logging
 from typing import List, Optional
 
-from ....src.mediapipe_vision.types import ImageEmbedderResult # Assuming this is the relevant type
+import torch
+import torch.nn.functional as F
+
+from ....src.mediapipe_vision.types import (
+    ImageEmbedderResult,  # Assuming this is the relevant type
+)
 
 logger = logging.getLogger(__name__)
 

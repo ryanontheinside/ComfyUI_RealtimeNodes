@@ -1,16 +1,16 @@
 import logging
+from typing import List, Optional
+
 import mediapipe as mp
 import numpy as np
 import torch
 from mediapipe.tasks import python
-from mediapipe.tasks.python.vision import interactive_segmenter
 from mediapipe.tasks.python.components.containers import keypoint
+from mediapipe.tasks.python.vision import interactive_segmenter
 
-from typing import List, Optional
-from ..types import PointOfInterest
 from ...utils.timing import TimestampProvider
+from ..types import PointOfInterest
 
-import logging
 logger = logging.getLogger(__name__)
 
 NormalizedKeypoint = keypoint.NormalizedKeypoint

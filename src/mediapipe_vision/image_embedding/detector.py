@@ -1,14 +1,18 @@
+from typing import List
+
 import mediapipe as mp
 import numpy as np
 import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
-from typing import List
-# Import new types
-from ..types import ImageEmbedderResult
+
 # Import TimestampProvider from the new location
 from ...utils.timing import TimestampProvider
+
+# Import new types
+from ..types import ImageEmbedderResult
+
 
 class ImageEmbedder:
     """Generates image embeddings using MediaPipe ImageEmbedder."""

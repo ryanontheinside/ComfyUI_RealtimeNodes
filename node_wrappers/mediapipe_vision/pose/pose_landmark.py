@@ -1,8 +1,10 @@
-import torch
-from ....src.mediapipe_vision.pose_landmark.detector import PoseLandmarkDetector
-from ..common.model_loader import MediaPipeModelLoaderBaseNode
-from ..common.base_detector_node import BaseMediaPipeDetectorNode
 import logging
+
+import torch
+
+from ....src.mediapipe_vision.pose_landmark.detector import PoseLandmarkDetector
+from ..common.base_detector_node import BaseMediaPipeDetectorNode
+from ..common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Pose"

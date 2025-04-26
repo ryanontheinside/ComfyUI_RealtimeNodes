@@ -1,13 +1,17 @@
+from typing import List, Optional, Tuple
+
 import mediapipe as mp
 import numpy as np
 import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
-from typing import List, Tuple, Optional
+
+from ...utils.timing import TimestampProvider
+
 # Import new types
 from ..types import LandmarkPoint, PoseLandmarksResult
-from ...utils.timing import TimestampProvider
+
 
 class PoseLandmarkDetector:
     """Detects pose landmarks in an image using MediaPipe PoseLandmarker."""

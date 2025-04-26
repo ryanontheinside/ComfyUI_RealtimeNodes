@@ -5,9 +5,10 @@ This module provides a centralized system for handling coordinates across differ
 spaces (normalized, pixel) with support for both single values and batches.
 """
 
-import torch
-from typing import Union, List, Tuple, Optional
 import logging
+from typing import List, Optional, Tuple, Union
+
+import torch
 
 logger = logging.getLogger(__name__)
 

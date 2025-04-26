@@ -1,7 +1,9 @@
+import logging
+
 import torch
+
 from ....src.mediapipe_vision.holistic_landmark.detector import HolisticLandmarkDetector
 from ..common.base_detector_node import BaseMediaPipeDetectorNode
-import logging
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Holistic"
