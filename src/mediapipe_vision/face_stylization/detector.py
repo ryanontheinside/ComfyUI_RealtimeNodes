@@ -4,7 +4,7 @@ import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from typing import List, Optional
-from ..utils.timestamp_provider import TimestampProvider
+from ...utils.timing import TimestampProvider
 
 class FaceStylizer:
     """Applies stylization to faces using MediaPipe FaceStylizer."""

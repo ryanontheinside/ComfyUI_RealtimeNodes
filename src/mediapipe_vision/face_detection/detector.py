@@ -12,7 +12,7 @@ from mediapipe.tasks.python.core.base_options import BaseOptions
 from typing import List, Tuple
 # Import new types
 from ..types import FaceDetectionResult, BoundingBox, FaceKeypoint
-from ..utils.timestamp_provider import TimestampProvider # Import from utils
+from ...utils.timing import TimestampProvider # Import from utils
 
 class FaceDetector:
     """Detects faces in an image using MediaPipe FaceDetector."""

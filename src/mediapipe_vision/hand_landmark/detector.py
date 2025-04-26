@@ -7,7 +7,7 @@ from mediapipe.tasks.python.core.base_options import BaseOptions
 from typing import List, Tuple, Optional
 # Import new types
 from ..types import LandmarkPoint, HandLandmarksResult
-from ..utils.timestamp_provider import TimestampProvider # Import TimestampProvider
+from ...utils.timing import TimestampProvider # Import TimestampProvider
 
 class HandLandmarkDetector:
     """Detects hand landmarks using MediaPipe HandLandmarker."""
