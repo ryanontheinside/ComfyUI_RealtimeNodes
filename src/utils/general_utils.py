@@ -1,7 +1,4 @@
-class AlwaysEqualProxy(str):
-    #borrowed from https://github.com/theUpsider/ComfyUI-Logic
-    def __eq__(self, _):
-        return True
+from .general import AlwaysEqualProxy
 
-    def __ne__(self, _):
-        return False
+# This file is maintained for backward compatibility
+# New code should import directly from src.utils.general
