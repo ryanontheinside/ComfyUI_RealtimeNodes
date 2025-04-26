@@ -1011,3 +1011,234 @@ class FeedbackEffect:
         
         return result
     
+class ToString:
+    """A node that converts any input to a string."""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "any": (AlwaysEqualProxy("*"),{}),  # Accept any input type
+                "format_string": ("STRING", {
+                    "default": "{}",
+                    "multiline": False,
+                    "tooltip": "Optional format string (e.g., '{:.2f}' for 2 decimal place float)"
+                })
+            },
+            "optional": {
+                "prepend": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Text to add before the converted string"
+                }),
+                "append": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Text to add after the converted string"
+                })
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "to_string"
+    CATEGORY = "utils"
+    
+    def to_string(self, any, format_string="{}", prepend="", append=""):
+        try:
+            # Try to use the format string if provided
+            result = format_string.format(any)
+        except (ValueError, TypeError):
+            # Fall back to simple string conversion if format fails
+            result = str(any)
+        
+        # Add prepend and append text
+        result = prepend + result + append
+            
+        return (result,)
+
+class RoundNode:
+    """A node that rounds a float to a specified number of decimal places."""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": ("FLOAT", {
+                    "default": 0.0,
+                    "tooltip": "Float value to round"
+                }),
+                "decimal_places": ("INT", {
+                    "default": 2,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "Number of decimal places to round to"
+                })
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT",)
+    RETURN_NAMES = ("rounded_value",)
+    FUNCTION = "round_value"
+    CATEGORY = "utils"
+    
+    def round_value(self, value, decimal_places):
+        if isinstance(value, (list, tuple, np.ndarray, torch.Tensor)):
+            rounded = [round(v, decimal_places) for v in value]
+        else:
+            rounded = round(value, decimal_places)
+        return (rounded,)
+
+class RenormalizeFloat:
+    """Renormalizes a float value from one range to another"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": ("FLOAT", {
+                    "default": 0.5,
+                    "forceInput": True,
+                    "tooltip": "Float value to renormalize"
+                }),
+                "input_min": ("FLOAT", {
+                    "default": 0.0,
+                    "step": 0.01,
+                    "tooltip": "Minimum value of the input range"
+                }),
+                "input_max": ("FLOAT", {
+                    "default": 1.0,
+                    "step": 0.01,
+                    "tooltip": "Maximum value of the input range"
+                }),
+                "output_min": ("FLOAT", {
+                    "default": 0.0,
+                    "step": 0.01,
+                    "tooltip": "Minimum value of the output range"
+                }),
+                "output_max": ("FLOAT", {
+                    "default": 1.0,
+                    "step": 0.01,
+                    "tooltip": "Maximum value of the output range"
+                }),
+                "clamp": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Clamp output to the output range"
+                })
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT",)
+    RETURN_NAMES = ("renormalized",)
+    FUNCTION = "renormalize"
+    CATEGORY = "utils"
+    
+    def renormalize(self, value, input_min, input_max, output_min, output_max, clamp):
+        """Rescales a value from an input range to an output range"""
+        # Check if value is a list, tuple, numpy array, or torch tensor
+        if isinstance(value, (list, tuple, np.ndarray, torch.Tensor)):
+            # Process element-wise
+            result = []
+            for v in value:
+                result.append(self._renormalize_single(v, input_min, input_max, output_min, output_max, clamp))
+            return (result,)
+        else:
+            # Process single value
+            result = self._renormalize_single(value, input_min, input_max, output_min, output_max, clamp)
+            return (result,)
+            
+    def _renormalize_single(self, value, input_min, input_max, output_min, output_max, clamp):
+        """Helper method to renormalize a single value"""
+        # Handle cases where input_min equals input_max
+        if abs(input_max - input_min) < 1e-6:
+            return output_min
+        
+        # Calculate normalized position in input range
+        normalized = (value - input_min) / (input_max - input_min)
+        
+        # Map to output range
+        result = output_min + normalized * (output_max - output_min)
+        
+        # Apply clamping if requested
+        if clamp:
+            if output_min <= output_max:
+                result = max(output_min, min(output_max, result))
+            else:
+                result = max(output_max, min(output_min, result))
+                
+        return result
+
+class RenormalizeInt:
+    """Renormalizes an integer value from one range to another"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": ("INT", {
+                    "default": 50,
+                    "forceInput": True,
+                    "tooltip": "Integer value to renormalize"
+                }),
+                "input_min": ("INT", {
+                    "default": 0,
+                    "tooltip": "Minimum value of the input range"
+                }),
+                "input_max": ("INT", {
+                    "default": 100,
+                    "tooltip": "Maximum value of the input range"
+                }),
+                "output_min": ("INT", {
+                    "default": 0,
+                    "tooltip": "Minimum value of the output range"
+                }),
+                "output_max": ("INT", {
+                    "default": 100,
+                    "tooltip": "Maximum value of the output range"
+                }),
+                "clamp": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Clamp output to the output range"
+                })
+            }
+        }
+
+    RETURN_TYPES = ("INT",)
+    RETURN_NAMES = ("renormalized",)
+    FUNCTION = "renormalize"
+    CATEGORY = "utils"
+    
+    def renormalize(self, value, input_min, input_max, output_min, output_max, clamp):
+        """Rescales an integer value from an input range to an output range"""
+        # Check if value is a list, tuple, numpy array, or torch tensor
+        if isinstance(value, (list, tuple, np.ndarray, torch.Tensor)):
+            # Process element-wise
+            result = []
+            for v in value:
+                result.append(self._renormalize_single(v, input_min, input_max, output_min, output_max, clamp))
+            return (result,)
+        else:
+            # Process single value
+            result = self._renormalize_single(value, input_min, input_max, output_min, output_max, clamp)
+            return (result,)
+            
+    def _renormalize_single(self, value, input_min, input_max, output_min, output_max, clamp):
+        """Helper method to renormalize a single integer value"""
+        # Handle cases where input_min equals input_max
+        if input_max == input_min:
+            return output_min
+            
+        # Calculate normalized position in input range
+        normalized = (value - input_min) / (input_max - input_min)
+        
+        # Map to output range and round to integer
+        result = round(output_min + normalized * (output_max - output_min))
+        
+        # Apply clamping if requested
+        if clamp:
+            if output_min <= output_max:
+                result = max(output_min, min(output_max, result))
+            else:
+                result = max(output_max, min(output_min, result))
+                
+        return result

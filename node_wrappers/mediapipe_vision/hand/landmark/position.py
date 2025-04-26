@@ -3,7 +3,7 @@ import logging
 from typing import List, Tuple, Any, Optional
 
 # Import the base class
-from ...common.universal_landmark_nodes import LandmarkPositionBaseNode
+from ...location_landmark.universal_landmark_nodes import LandmarkPositionBaseNode
 # Import the specific landmark type for clarity and potential future use
 from .....src.mediapipe_vision.types import HAND_LANDMARKS
 # Import the landmark definitions
@@ -27,6 +27,7 @@ class HandLandmarkPositionNode(LandmarkPositionBaseNode):
             "required": {
                 "landmarks": (cls.LANDMARKS_TYPE, {"forceInput": True}),
                 "landmark_index": ("INT", {"default": 8, "min": 0, "max": 20, "tooltip": HAND_LANDMARK_TOOLTIP}),
+                "result_index": ("INT", {"default": 0, "min": 0, "tooltip": "Index of the hand detection to use (0=first detected hand)"}),
                 "use_world_coordinates": ("BOOLEAN", {"default": False, "tooltip": "Use world coordinates if available"}),
             }
         }
