@@ -1,4 +1,4 @@
-from typing import List, Optional, NamedTuple, Tuple
+from typing import List, Optional, NamedTuple
 import numpy as np # Added numpy for matrix type
 
 # Define a structure for a single landmark point

@@ -1,5 +1,4 @@
 import torch
-import comfy.utils
 import numpy as np
 import base64
 import re
@@ -7,8 +6,6 @@ import math
 from io import BytesIO
 from PIL import Image, ImageFont, ImageDraw, ImageOps
 import nodes
-import random
-from torchvision import transforms
 from ...src.utils.general import AlwaysEqualProxy
 MAX_RESOLUTION = nodes.MAX_RESOLUTION  # Get the same max resolution as core nodes
 
