@@ -8,7 +8,6 @@
 import math
 from typing import Optional
 
-from ...utils.math import scale_value
 from ..types import LandmarkPoint # Assuming LandmarkPoint is in src/types.py
 #TODO: refactor to common after unified coordinate system
 def calculate_euclidean_delta(p1: Optional[LandmarkPoint], p2: Optional[LandmarkPoint]) -> Optional[float]:

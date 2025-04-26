@@ -1,5 +1,4 @@
 # src/utils/misc_utils.py
-import mediapipe as mp
 import logging
 from typing import List
 
