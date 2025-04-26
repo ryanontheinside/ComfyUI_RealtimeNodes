@@ -2,7 +2,6 @@
 import mediapipe as mp
 from typing import Optional, List, Any
 
-from ....src.mediapipe_vision.types import PoseLandmarksResult # Import specific result type if needed for extraction
 from ..common.base_visualization_nodes import BaseLandmarkVisualizationNode
 
 import logging
