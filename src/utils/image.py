@@ -8,7 +8,7 @@ particularly between ComfyUI tensor format (BHWC) and OpenCV format.
 import torch
 import numpy as np
 import cv2
-from typing import List, Union, Tuple
+from typing import List, Tuple
 
 def convert_to_cv2(tensor: torch.Tensor) -> list:
     """Converts a ComfyUI IMAGE tensor (BHWC, float32, 0-1) to a list of cv2 images (BGR, uint8)."""
@@ -61,7 +61,7 @@ def create_mask_from_points(height: int, width: int, points: List[Tuple[int, int
         np_points = np.array(points, dtype=np.int32)
         hull = cv2.convexHull(np_points)
         cv2.fillPoly(mask, [hull], 1)
-    except Exception as e:
+    except Exception:
         return torch.from_numpy(mask).float().unsqueeze(0).to(device)
         
     mask_tensor = torch.from_numpy(mask).float().unsqueeze(0).to(device)

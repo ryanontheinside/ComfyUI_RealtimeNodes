@@ -8,7 +8,7 @@ Contains functions for mathematical operations including:
 """
 
 import math
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple
 
 def scale_value(value: Optional[float], 
                 input_min: float, input_max: float, 
