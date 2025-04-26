@@ -5,8 +5,8 @@ import logging
 from typing import List 
 
 from .....src.mediapipe_vision.types import HandLandmarksResult
-# Reusing the helper function from face masking
-from .....src.mediapipe_vision.utils.mask_utils import create_mask_from_points 
+# Updated import path
+from .....src.utils.image import create_mask_from_points
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Hand/HandLandmark/Masking"
