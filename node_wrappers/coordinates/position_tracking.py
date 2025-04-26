@@ -1,11 +1,9 @@
 import logging
-from typing import Optional, List, Any, Tuple, Union
+from typing import List, Tuple, Union
 import math
 import torch
 import numpy as np
 import cv2
-import collections
-import typing # Add typing for Dict hint
 
 #TODO: consider moving base nodes to src
 

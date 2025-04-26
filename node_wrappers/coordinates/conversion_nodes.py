@@ -4,9 +4,7 @@ Node wrappers for coordinate conversion in ComfyUI.
 These nodes provide user-friendly interfaces for the coordinate system functionality.
 """
 
-import torch
 import logging
-from typing import Union, List, Tuple
 
 from ...src.coordinates import CoordinateSystem
 
