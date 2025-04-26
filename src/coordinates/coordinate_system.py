@@ -6,8 +6,7 @@ spaces (normalized, pixel) with support for both single values and batches.
 """
 
 import torch
-import numpy as np
-from typing import Union, List, Tuple, Optional, Dict, Any
+from typing import Union, List, Tuple, Optional
 import logging
 
 logger = logging.getLogger(__name__)

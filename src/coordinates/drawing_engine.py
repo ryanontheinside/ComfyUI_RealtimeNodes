@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import cv2
-from typing import Union, List, Tuple, Dict, Optional, Any
+from typing import Union, List, Tuple
 import logging
 
 from .coordinate_system import CoordinateSystem
