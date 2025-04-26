@@ -1,7 +1,6 @@
 import logging
-from typing import List, Dict, Tuple, Any, Optional, Type
+from typing import List, Any, Optional
 import cv2
-import numpy as np
 
 from ....src.utils.image import convert_to_cv2, convert_to_tensor
 

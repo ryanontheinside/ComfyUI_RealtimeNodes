@@ -6,7 +6,7 @@ import logging
 import traceback # For better error logging
 
 # Add import for MEDIAPIPE_MODELS dictionary and the get_model_description function
-from ....src.mediapipe_vision.model_loader import MEDIAPIPE_MODELS, get_model_description
+from ....src.mediapipe_vision.model_loader import get_model_description
 
 logger = logging.getLogger(__name__)
 

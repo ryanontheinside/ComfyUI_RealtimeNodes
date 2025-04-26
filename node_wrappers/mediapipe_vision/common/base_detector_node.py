@@ -1,8 +1,7 @@
 """Base node wrapper for MediaPipe Vision detectors."""
 
-import torch
 import logging
-from typing import Any, Dict, List, Tuple, Optional, Type, Callable, Union
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
