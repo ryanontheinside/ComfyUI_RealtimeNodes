@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import cv2
 from ....src.realtimenodes.control_base import ControlNodeBase
 from ....src.realtimenodes.mask_controls import MaskControlMixin
 
