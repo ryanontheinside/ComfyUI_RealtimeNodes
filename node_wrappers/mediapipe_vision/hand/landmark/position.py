@@ -3,7 +3,7 @@ import logging
 from typing import List, Tuple, Any, Optional
 
 # Import the base class
-from ...location_landmark.universal_landmark_nodes import LandmarkPositionBaseNode
+from .....src.mediapipe_vision.common.position import LandmarkPositionBase
 # Import the specific landmark type for clarity and potential future use
 from .....src.mediapipe_vision.types import HAND_LANDMARKS
 # Import the landmark definitions
@@ -12,7 +12,7 @@ from .....src.mediapipe_vision.landmark_definitions import HAND_LANDMARK_TOOLTIP
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Hand/HandLandmark/Position"
 
-class HandLandmarkPositionNode(LandmarkPositionBaseNode):
+class HandLandmarkPositionNode(LandmarkPositionBase):
     """Extracts position lists (x, y, z, vis, pres) for a specific landmark index
        from HAND_LANDMARKS across the batch."""
     CATEGORY = _category
