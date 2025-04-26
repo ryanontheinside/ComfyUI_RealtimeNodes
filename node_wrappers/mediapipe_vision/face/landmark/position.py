@@ -1,13 +1,12 @@
 import logging
-from ...location_landmark.universal_landmark_nodes import LandmarkPositionBaseNode
-# Import the landmark definitions
+from .....src.mediapipe_vision.common.position import LandmarkPositionBase
 from .....src.mediapipe_vision.landmark_definitions import FACE_LANDMARK_TOOLTIP
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) 
 
 _category = "Realtime Nodes/MediaPipe Vision/Face/FaceLandmark/Position"
 
-class FaceLandmarkPositionNode(LandmarkPositionBaseNode):
+class FaceLandmarkPositionNode(LandmarkPositionBase):
     """Extracts position lists (x, y, z, vis, pres) for a specific landmark index
        from FACE_LANDMARKS across the batch."""
     CATEGORY = _category
