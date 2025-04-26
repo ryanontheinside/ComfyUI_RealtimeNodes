@@ -4,7 +4,7 @@ import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
-from typing import List, Optional
+from typing import List
 # Import new types
 from ..types import ImageEmbedderResult
 # Import TimestampProvider from the new location

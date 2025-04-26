@@ -3,10 +3,6 @@ import mediapipe as mp
 import numpy as np
 import torch
 from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
-from mediapipe.tasks.python.vision.interactive_segmenter import (
-    InteractiveSegmenter, 
-)
 from mediapipe.tasks.python.vision import interactive_segmenter
 from mediapipe.tasks.python.components.containers import keypoint
 

@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from typing import List, Optional
 from ...utils.timing import TimestampProvider
 
 class FaceStylizer:

@@ -9,7 +9,7 @@ import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
-from typing import List, Tuple
+from typing import List
 # Import new types
 from ..types import FaceDetectionResult, BoundingBox, FaceKeypoint
 from ...utils.timing import TimestampProvider # Import from utils

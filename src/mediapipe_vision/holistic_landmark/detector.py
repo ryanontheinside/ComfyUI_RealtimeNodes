@@ -8,7 +8,7 @@ import mediapipe as mp
 import numpy as np
 import torch
 import cv2
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Any
 
 # Import needed types
 from ..types import LandmarkPoint, HolisticLandmarksResult
