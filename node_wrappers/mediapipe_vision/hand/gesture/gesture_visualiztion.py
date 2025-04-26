@@ -1,6 +1,4 @@
 # visualize_gestures.py
-import torch
-import numpy as np
 import cv2
 
 from ...common.base_visualization_nodes import BaseDetectionVisualizationNode
