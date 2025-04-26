@@ -1,1 +1,1 @@
-"""Face Stylization implementation using MediaPipe.""" 
+"""Face Stylization implementation using MediaPipe."""

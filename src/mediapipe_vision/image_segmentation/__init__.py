@@ -1,1 +1,1 @@
-"""Image Segmentation implementation using MediaPipe.""" 
+"""Image Segmentation implementation using MediaPipe."""

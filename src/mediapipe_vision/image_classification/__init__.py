@@ -1,1 +1,1 @@
-"""Image Classification implementation using MediaPipe.""" 
+"""Image Classification implementation using MediaPipe."""

@@ -10,10 +10,12 @@ from ...src.coordinates import CoordinateSystem
 
 logger = logging.getLogger(__name__)
 
+
 class CoordinateConverterNode:
     """
     Fast coordinate conversion between different coordinate spaces.
     """
+
     CATEGORY = "Realtime Nodes/Coordinates"
     FUNCTION = "convert_coordinates"
     RETURN_TYPES = ("FLOAT", "FLOAT")
@@ -40,20 +42,20 @@ class CoordinateConverterNode:
         try:
             # Get dimensions from image
             dimensions = CoordinateSystem.get_dimensions_from_tensor(image_for_dimensions)
-            
+
             # Map string inputs to CoordinateSystem constants
             space_map = {
                 "pixel": CoordinateSystem.PIXEL,
                 "normalized": CoordinateSystem.NORMALIZED,
             }
-            
+
             from_space_const = space_map[from_space]
             to_space_const = space_map[to_space]
-            
+
             # Convert coordinates
             x_out = CoordinateSystem.convert(x, dimensions[0], from_space_const, to_space_const)
             y_out = CoordinateSystem.convert(y, dimensions[1], from_space_const, to_space_const)
-            
+
             return (x_out, y_out)
         except Exception as e:
             logger.error(f"Error in coordinate conversion: {e}")
@@ -64,6 +66,7 @@ class Point2DNode:
     """
     Creates a 2D point with coordinate space awareness.
     """
+
     CATEGORY = "Realtime Nodes/Coordinates"
     FUNCTION = "create_point"
     RETURN_TYPES = ("POINT",)
@@ -78,26 +81,29 @@ class Point2DNode:
                 "space": (["normalized", "pixel"],),
             },
             "optional": {
-                "image_for_dimensions": ("IMAGE", {"tooltip": "Reference image for dimensions (required for pixel space)"}),
-            }
+                "image_for_dimensions": (
+                    "IMAGE",
+                    {"tooltip": "Reference image for dimensions (required for pixel space)"},
+                ),
+            },
         }
 
     def create_point(self, x, y, space, image_for_dimensions=None):
         """Create a Point object."""
         from ...src.coordinates import Point
-        
+
         space_map = {
             "pixel": CoordinateSystem.PIXEL,
             "normalized": CoordinateSystem.NORMALIZED,
         }
-        
+
         space_const = space_map[space]
-        
+
         # Validate dimensions if using pixel space
         if space == "pixel" and image_for_dimensions is None:
             logger.warning("Pixel space selected but no image provided for dimensions. Using normalized space.")
             space_const = CoordinateSystem.NORMALIZED
-        
+
         return (Point(x, y, None, space_const),)
 
 
@@ -105,6 +111,7 @@ class PointListNode:
     """
     Creates a list of points from coordinate lists.
     """
+
     CATEGORY = "Realtime Nodes/Coordinates"
     FUNCTION = "create_point_list"
     RETURN_TYPES = ("POINT_LIST",)
@@ -114,32 +121,44 @@ class PointListNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "x_coords": ("FLOAT", {"default": [0.25, 0.5, 0.75], "forceInput": True, "tooltip": "List of X coordinates"}),
-                "y_coords": ("FLOAT", {"default": [0.25, 0.5, 0.75], "forceInput": True, "tooltip": "List of Y coordinates"}),
+                "x_coords": (
+                    "FLOAT",
+                    {"default": [0.25, 0.5, 0.75], "forceInput": True, "tooltip": "List of X coordinates"},
+                ),
+                "y_coords": (
+                    "FLOAT",
+                    {"default": [0.25, 0.5, 0.75], "forceInput": True, "tooltip": "List of Y coordinates"},
+                ),
                 "space": (["normalized", "pixel"],),
             },
             "optional": {
-                "z_coords": ("FLOAT", {"default": None, "forceInput": True, "tooltip": "List of Z coordinates (optional)"}),
-                "image_for_dimensions": ("IMAGE", {"tooltip": "Reference image for dimensions (required for pixel space)"}),
-            }
+                "z_coords": (
+                    "FLOAT",
+                    {"default": None, "forceInput": True, "tooltip": "List of Z coordinates (optional)"},
+                ),
+                "image_for_dimensions": (
+                    "IMAGE",
+                    {"tooltip": "Reference image for dimensions (required for pixel space)"},
+                ),
+            },
         }
 
     def create_point_list(self, x_coords, y_coords, space, z_coords=None, image_for_dimensions=None):
         """Create a PointList object."""
         from ...src.coordinates import PointList
-        
+
         space_map = {
             "pixel": CoordinateSystem.PIXEL,
             "normalized": CoordinateSystem.NORMALIZED,
         }
-        
+
         space_const = space_map[space]
-        
+
         # Validate dimensions if using pixel space
         if space == "pixel" and image_for_dimensions is None:
             logger.warning("Pixel space selected but no image provided for dimensions. Using normalized space.")
             space_const = CoordinateSystem.NORMALIZED
-        
+
         # Ensure inputs are lists
         if not isinstance(x_coords, list):
             x_coords = [x_coords]
@@ -147,7 +166,7 @@ class PointListNode:
             y_coords = [y_coords]
         if z_coords is not None and not isinstance(z_coords, list):
             z_coords = [z_coords]
-        
+
         return (PointList.from_coordinates(x_coords, y_coords, z_coords, space_const),)
 
 
@@ -163,4 +182,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CoordinateConverter": "Coordinate Converter",
     "Point2D": "Create 2D Point",
     "PointList": "Create Point List",
-} 
+}

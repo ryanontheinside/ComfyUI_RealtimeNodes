@@ -1,1 +1,1 @@
-"""Face Detection implementation using MediaPipe.""" 
+"""Face Detection implementation using MediaPipe."""

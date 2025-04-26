@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 ALL_BLENDSHAPE_CATEGORIES = get_blendshape_categories()
 if not ALL_BLENDSHAPE_CATEGORIES:
     logger.warning("Could not retrieve blendshape categories. Blendshape nodes might not function correctly.")
-    ALL_BLENDSHAPE_CATEGORIES = ["_neutral"] # Provide a fallback
+    ALL_BLENDSHAPE_CATEGORIES = ["_neutral"]  # Provide a fallback
 
 _category = "Realtime Nodes/MediaPipe Vision/Face/Blendshape"
 
@@ -28,8 +28,8 @@ _category = "Realtime Nodes/MediaPipe Vision/Face/Blendshape"
 def get_blendshape_score(blendshapes_result: BLENDSHAPES_LIST, category_name: str) -> Optional[float]:
     """Extracts the score for a specific blendshape category from the result."""
     if not blendshapes_result or not blendshapes_result[0] or not blendshapes_result[0][0]:
-        #logger.debug(f"No blendshapes found in result.")
-        return None # No blendshape data
+        # logger.debug(f"No blendshapes found in result.")
+        return None  # No blendshape data
 
     # BLENDSHAPES structure: List[List[Dict[str, float]]]
     # We typically care about the first face in the first batch item
@@ -44,12 +44,15 @@ def get_blendshape_score(blendshapes_result: BLENDSHAPES_LIST, category_name: st
     elif isinstance(first_face_blendshapes, list):
         # Try to handle the list format with objects that have category_name attribute
         try:
-            target_blendshape = next((bs for bs in first_face_blendshapes if hasattr(bs, 'category_name') and bs.category_name == category_name), None)
+            target_blendshape = next(
+                (bs for bs in first_face_blendshapes if hasattr(bs, "category_name") and bs.category_name == category_name),
+                None,
+            )
             if target_blendshape:
                 return target_blendshape.score
         except Exception as e:
             logger.error(f"Error processing blendshape list: {e}")
-    
+
     logger.warning(f"Blendshape category '{category_name}' not found in results. Type: {type(first_face_blendshapes)}")
     return None
 
@@ -57,6 +60,7 @@ def get_blendshape_score(blendshapes_result: BLENDSHAPES_LIST, category_name: st
 # --- Control Nodes ---
 class BlendshapeControlFloatNode:
     """Outputs a scaled FLOAT based on the score of a selected blendshape."""
+
     CATEGORY = _category
     RETURN_TYPES = ("FLOAT",)
     FUNCTION = "execute"
@@ -66,20 +70,57 @@ class BlendshapeControlFloatNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "blendshapes": ("BLENDSHAPES_LIST", {"tooltip": "Facial expression data from the Face Landmarker node"}),
-                "blendshape_name": (ALL_BLENDSHAPE_CATEGORIES, {"default": "mouthSmileLeft", 
-                                                              "tooltip": "The specific facial expression to monitor (e.g., smile, frown, raised eyebrows)"}),
+                "blendshapes": (
+                    "BLENDSHAPES_LIST",
+                    {"tooltip": "Facial expression data from the Face Landmarker node"},
+                ),
+                "blendshape_name": (
+                    ALL_BLENDSHAPE_CATEGORIES,
+                    {
+                        "default": "mouthSmileLeft",
+                        "tooltip": "The specific facial expression to monitor (e.g., smile, frown, raised eyebrows)",
+                    },
+                ),
                 # Blendshape scores are typically 0.0 to 1.0, but allow flexibility
-                "score_min": ("FLOAT", {"default": 0.0, "step": 0.01, 
-                                      "tooltip": "The minimum facial expression intensity to consider (usually 0.0)"}),
-                "score_max": ("FLOAT", {"default": 1.0, "step": 0.01, 
-                                      "tooltip": "The maximum facial expression intensity to consider (usually 1.0)"}),
-                "output_min_float": ("FLOAT", {"default": 0.0, "step": 0.01, 
-                                             "tooltip": "The minimum output value when expression is at or below score_min"}),
-                "output_max_float": ("FLOAT", {"default": 1.0, "step": 0.01, 
-                                             "tooltip": "The maximum output value when expression is at or above score_max"}),
-                "clamp": ("BOOLEAN", {"default": True, 
-                                    "tooltip": "When enabled, restricts output values to stay within min and max range"}),
+                "score_min": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "step": 0.01,
+                        "tooltip": "The minimum facial expression intensity to consider (usually 0.0)",
+                    },
+                ),
+                "score_max": (
+                    "FLOAT",
+                    {
+                        "default": 1.0,
+                        "step": 0.01,
+                        "tooltip": "The maximum facial expression intensity to consider (usually 1.0)",
+                    },
+                ),
+                "output_min_float": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "step": 0.01,
+                        "tooltip": "The minimum output value when expression is at or below score_min",
+                    },
+                ),
+                "output_max_float": (
+                    "FLOAT",
+                    {
+                        "default": 1.0,
+                        "step": 0.01,
+                        "tooltip": "The maximum output value when expression is at or above score_max",
+                    },
+                ),
+                "clamp": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "When enabled, restricts output values to stay within min and max range",
+                    },
+                ),
             }
         }
 
@@ -92,8 +133,10 @@ class BlendshapeControlFloatNode:
         output_val = scaled_value if scaled_value is not None else float(output_min_float)
         return (output_val,)
 
+
 class BlendshapeControlIntNode:
     """Outputs a scaled INT based on the score of a selected blendshape."""
+
     CATEGORY = _category
     RETURN_TYPES = ("INT",)
     FUNCTION = "execute"
@@ -103,19 +146,54 @@ class BlendshapeControlIntNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "blendshapes": ("BLENDSHAPES_LIST", {"tooltip": "Facial expression data from the Face Landmarker node"}),
-                "blendshape_name": (ALL_BLENDSHAPE_CATEGORIES, {"default": "mouthSmileLeft", 
-                                                              "tooltip": "The specific facial expression to monitor (e.g., smile, frown, raised eyebrows)"}),
-                "score_min": ("FLOAT", {"default": 0.0, "step": 0.01, 
-                                      "tooltip": "The minimum facial expression intensity to consider (usually 0.0)"}),
-                "score_max": ("FLOAT", {"default": 1.0, "step": 0.01, 
-                                      "tooltip": "The maximum facial expression intensity to consider (usually 1.0)"}),
-                "output_min_int": ("INT", {"default": 0, 
-                                         "tooltip": "The minimum integer output value when expression is at or below score_min"}),
-                "output_max_int": ("INT", {"default": 100, 
-                                         "tooltip": "The maximum integer output value when expression is at or above score_max"}),
-                "clamp": ("BOOLEAN", {"default": True, 
-                                    "tooltip": "When enabled, restricts output values to stay within min and max range"}),
+                "blendshapes": (
+                    "BLENDSHAPES_LIST",
+                    {"tooltip": "Facial expression data from the Face Landmarker node"},
+                ),
+                "blendshape_name": (
+                    ALL_BLENDSHAPE_CATEGORIES,
+                    {
+                        "default": "mouthSmileLeft",
+                        "tooltip": "The specific facial expression to monitor (e.g., smile, frown, raised eyebrows)",
+                    },
+                ),
+                "score_min": (
+                    "FLOAT",
+                    {
+                        "default": 0.0,
+                        "step": 0.01,
+                        "tooltip": "The minimum facial expression intensity to consider (usually 0.0)",
+                    },
+                ),
+                "score_max": (
+                    "FLOAT",
+                    {
+                        "default": 1.0,
+                        "step": 0.01,
+                        "tooltip": "The maximum facial expression intensity to consider (usually 1.0)",
+                    },
+                ),
+                "output_min_int": (
+                    "INT",
+                    {
+                        "default": 0,
+                        "tooltip": "The minimum integer output value when expression is at or below score_min",
+                    },
+                ),
+                "output_max_int": (
+                    "INT",
+                    {
+                        "default": 100,
+                        "tooltip": "The maximum integer output value when expression is at or above score_max",
+                    },
+                ),
+                "clamp": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "When enabled, restricts output values to stay within min and max range",
+                    },
+                ),
             }
         }
 
@@ -132,6 +210,7 @@ class BlendshapeControlIntNode:
 # --- Trigger Node ---
 class BlendshapeTriggerNode:
     """Outputs a BOOLEAN trigger if a blendshape score crosses a threshold."""
+
     CATEGORY = _category
     RETURN_TYPES = ("BOOLEAN",)
     FUNCTION = "execute"
@@ -141,13 +220,31 @@ class BlendshapeTriggerNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "blendshapes": ("BLENDSHAPES_LIST", {"tooltip": "Facial expression data from the Face Landmarker node"}),
-                "blendshape_name": (ALL_BLENDSHAPE_CATEGORIES, {"default": "jawOpen", 
-                                                              "tooltip": "The specific facial expression to monitor (e.g., smile, frown, open mouth)"}),
-                "threshold": ("FLOAT", {"default": 0.5, "step": 0.01, 
-                                      "tooltip": "The expression intensity threshold value that triggers the condition"}),
-                "condition": (["Above", "Below", "Equals", "Not Equals"], 
-                             {"tooltip": "The condition that determines when to trigger - Above (expression > threshold), Below (expression < threshold), etc."}),
+                "blendshapes": (
+                    "BLENDSHAPES_LIST",
+                    {"tooltip": "Facial expression data from the Face Landmarker node"},
+                ),
+                "blendshape_name": (
+                    ALL_BLENDSHAPE_CATEGORIES,
+                    {
+                        "default": "jawOpen",
+                        "tooltip": "The specific facial expression to monitor (e.g., smile, frown, open mouth)",
+                    },
+                ),
+                "threshold": (
+                    "FLOAT",
+                    {
+                        "default": 0.5,
+                        "step": 0.01,
+                        "tooltip": "The expression intensity threshold value that triggers the condition",
+                    },
+                ),
+                "condition": (
+                    ["Above", "Below", "Equals", "Not Equals"],
+                    {
+                        "tooltip": "The condition that determines when to trigger - Above (expression > threshold), Below (expression < threshold), etc."
+                    },
+                ),
             }
         }
 
@@ -179,4 +276,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "BlendshapeControlFloat": "Blendshape Control (Float)",
     "BlendshapeControlInt": "Blendshape Control (Int)",
     "BlendshapeTrigger": "Blendshape Trigger",
-} 
+}

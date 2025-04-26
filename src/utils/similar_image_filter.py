@@ -41,6 +41,6 @@ class SimilarImageFilter:
 
     def set_threshold(self, threshold: float) -> None:
         self.threshold = threshold
-    
+
     def set_max_skip_frame(self, max_skip_frame: float) -> None:
         self.max_skip_frame = max_skip_frame

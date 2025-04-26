@@ -44,7 +44,6 @@ FACE_LANDMARK_DESCRIPTIONS = {
     86: "Bottom lip bottom center",
     14: "Upper teeth",
     13: "Lower teeth",
-    
     # General regions (for tooltip summary)
     # 0-17: Jaw/face outline
     # 18-35: Eyebrows
@@ -75,7 +74,7 @@ Notable:
 # Hand landmarks (21 points)
 HAND_LANDMARK_DESCRIPTIONS = {
     0: "Wrist",
-    1: "Thumb CMC", 
+    1: "Thumb CMC",
     2: "Thumb MCP",
     3: "Thumb IP",
     4: "Thumb tip",
@@ -94,7 +93,7 @@ HAND_LANDMARK_DESCRIPTIONS = {
     17: "Pinky MCP",
     18: "Pinky PIP",
     19: "Pinky DIP",
-    20: "Pinky tip"
+    20: "Pinky tip",
 }
 
 # Tooltip for hand landmarks
@@ -143,7 +142,7 @@ POSE_LANDMARK_DESCRIPTIONS = {
     29: "Left heel",
     30: "Right heel",
     31: "Left foot index",
-    32: "Right foot index"
+    32: "Right foot index",
 }
 
 # Tooltip for pose landmarks
@@ -158,4 +157,4 @@ POSE_LANDMARK_TOOLTIP = """MediaPipe Pose Landmarks (0-32):
   23-24: Hips
   25-26: Knees
   27-28: Ankles
-  29-32: Feet""" 
+  29-32: Feet"""

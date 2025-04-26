@@ -15,3 +15,6 @@ Repository = "https://github.com/ryanontheinside/ComfyUI_RealTimeNodes"
 PublisherId = "ryanontheinside"
 DisplayName = "ComfyUI_RealTimeNodes"
 Icon = "⏱️"
+
+[tool.ruff]
+line-length = 140
