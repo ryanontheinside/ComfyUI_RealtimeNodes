@@ -30,7 +30,7 @@ class LandmarkPositionBaseNode:
     Base class for extracting position lists from specific landmark types.
     Outputs values corresponding to the input batch size, using defaults for missing items.
     Includes an 'is_valid' flag indicating successful extraction for each batch item.
-    Processes only the first detected object (e.g., face, hand) per batch item.
+    Processes only the detected object at the specified result_index per batch item.
     RETURN_TYPES declare the semantic type (FLOAT/BOOLEAN); the actual return value may be a list.
     """
     FUNCTION = "extract_positions"
@@ -44,7 +44,7 @@ class LandmarkPositionBaseNode:
 
     # INPUT_TYPES are defined in subclasses
 
-    def extract_positions(self, landmarks: list, landmark_index: int, use_world_coordinates: bool = False) -> Tuple[List[float], List[float], List[float], List[float], List[float], List[bool]]:
+    def extract_positions(self, landmarks: list, landmark_index: int, result_index: int = 0, use_world_coordinates: bool = False) -> Tuple[List[float], List[float], List[float], List[float], List[float], List[bool]]:
         """Extracts position and properties for the specified landmark across the entire batch,
            padding with defaults and providing validity flags for missing items."""
 
@@ -71,38 +71,42 @@ class LandmarkPositionBaseNode:
             
             # Check if item_list is valid and contains at least one result item
             if isinstance(item_list, list) and item_list:
-                result_item = item_list[0] # Process only the first detected object
+                # Get the result at the specified index if it exists
+                if result_index < len(item_list):
+                    result_item = item_list[result_index]
 
-                if result_item is not None:
-                    try:
-                        # --- Determine Structure and Extract Landmark List --- 
-                        # Case 1: result_item is the list itself (FACE_LANDMARKS)
-                        if isinstance(result_item, list):
-                            target_landmarks_list = result_item
-                            if use_world_coordinates and self.LANDMARKS_TYPE == "FACE_LANDMARKS":
-                                logger.warning(f"World coordinates requested but not available for FACE_LANDMARKS. Using image coordinates.")
+                    if result_item is not None:
+                        try:
+                            # --- Determine Structure and Extract Landmark List --- 
+                            # Case 1: result_item is the list itself (FACE_LANDMARKS)
+                            if isinstance(result_item, list):
+                                target_landmarks_list = result_item
+                                if use_world_coordinates and self.LANDMARKS_TYPE == "FACE_LANDMARKS":
+                                    logger.warning(f"World coordinates requested but not available for FACE_LANDMARKS. Using image coordinates.")
 
-                        # Case 2: result_item is an object with .landmarks (HAND/POSE_LANDMARKS)
-                        elif hasattr(result_item, 'landmarks'):
-                            landmarks_attr = getattr(result_item, 'landmarks', None)
-                            if landmarks_attr is not None:
-                                use_world = (use_world_coordinates and
-                                             self.LANDMARKS_TYPE != "FACE_LANDMARKS" and
-                                             hasattr(result_item, 'world_landmarks') and
-                                             getattr(result_item, 'world_landmarks', None))
-                                if use_world:
-                                    target_landmarks_list = result_item.world_landmarks
-                                else:
-                                    target_landmarks_list = landmarks_attr
-                        # else: target_landmarks_list remains None
+                            # Case 2: result_item is an object with .landmarks (HAND/POSE_LANDMARKS)
+                            elif hasattr(result_item, 'landmarks'):
+                                landmarks_attr = getattr(result_item, 'landmarks', None)
+                                if landmarks_attr is not None:
+                                    use_world = (use_world_coordinates and
+                                                 self.LANDMARKS_TYPE != "FACE_LANDMARKS" and
+                                                 hasattr(result_item, 'world_landmarks') and
+                                                 getattr(result_item, 'world_landmarks', None))
+                                    if use_world:
+                                        target_landmarks_list = result_item.world_landmarks
+                                    else:
+                                        target_landmarks_list = landmarks_attr
+                            # else: target_landmarks_list remains None
 
-                        # --- Find Landmark Point by Index ---
-                        if isinstance(target_landmarks_list, list) and target_landmarks_list:
-                            landmark_point = next((lm for lm in target_landmarks_list if lm.index == landmark_index), None)
-                        
-                    except Exception as e:
-                         logger.error(f"{self.__class__.__name__}: Unexpected error processing batch item {batch_idx}: {e}", exc_info=True)
-                         # Keep landmark_point as None, is_valid as False
+                            # --- Find Landmark Point by Index ---
+                            if isinstance(target_landmarks_list, list) and target_landmarks_list:
+                                landmark_point = next((lm for lm in target_landmarks_list if lm.index == landmark_index), None)
+                            
+                        except Exception as e:
+                             logger.error(f"{self.__class__.__name__}: Unexpected error processing batch item {batch_idx}: {e}", exc_info=True)
+                             # Keep landmark_point as None, is_valid as False
+                else:
+                    logger.debug(f"{self.__class__.__name__}: Result index {result_index} exceeds available detections for batch item {batch_idx} (has {len(item_list)})")
             # else: item_list was not a list or was empty, keep defaults/invalid
 
             # --- Extract Values or Use Defaults, Set Validity ---
