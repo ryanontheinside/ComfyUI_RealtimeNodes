@@ -1,11 +1,9 @@
 # node_wrappers/hand/position.py
 import logging
-from typing import List, Tuple, Any, Optional
 
 # Import the base class
 from .....src.mediapipe_vision.common.position import LandmarkPositionBase
 # Import the specific landmark type for clarity and potential future use
-from .....src.mediapipe_vision.types import HAND_LANDMARKS
 # Import the landmark definitions
 from .....src.mediapipe_vision.landmark_definitions import HAND_LANDMARK_TOOLTIP
 
