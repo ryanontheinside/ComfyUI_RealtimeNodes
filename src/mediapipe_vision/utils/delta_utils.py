@@ -1,6 +1,7 @@
 import math
 from typing import Optional
 
+from ...utils.math import scale_value
 from ..types import LandmarkPoint # Assuming LandmarkPoint is in src/types.py
 
 def calculate_euclidean_delta(p1: Optional[LandmarkPoint], p2: Optional[LandmarkPoint]) -> Optional[float]:
@@ -15,21 +16,4 @@ def calculate_euclidean_delta(p1: Optional[LandmarkPoint], p2: Optional[Landmark
     distance = math.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
     return distance
 
-def scale_value(value: Optional[float], 
-                  delta_min: float, delta_max: float, 
-                  output_min: float, output_max: float, 
-                  clamp: bool = True) -> Optional[float]:
-    """Linearly scales a value from one range to another."""
-    if value is None:
-        return None
-    if delta_max == delta_min: # Avoid division by zero
-        return output_min if value <= delta_min else output_max
-        
-    # Scale
-    scaled = output_min + (value - delta_min) * (output_max - output_min) / (delta_max - delta_min)
-    
-    # Clamp
-    if clamp:
-        scaled = max(output_min, min(output_max, scaled))
-        
-    return scaled 
+# scale_value is now imported from utils.math 

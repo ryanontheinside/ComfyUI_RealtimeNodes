@@ -1,3 +1,11 @@
+"""Image utilities for MediaPipe Vision integration."""
+
+# Import from the new consolidated utilities
+from ...utils.image import convert_to_cv2, convert_to_tensor
+
+# This file is maintained for backward compatibility
+# New code should import directly from src.utils
+
 import torch
 import numpy as np
 import cv2
