@@ -7,7 +7,7 @@ from .....src.mediapipe_vision.utils.misc_utils import get_blendshape_categories
 
 # Import base trigger/control logic if we adapt base classes later, or implement directly for now
 from ...location_landmark.universal_landmark_nodes import FLOAT_EQUALITY_TOLERANCE # For trigger node comparisons
-from .....src.mediapipe_vision.utils.delta_utils import scale_value
+from .....src.utils.math import scale_value
 
 logger = logging.getLogger(__name__)
 

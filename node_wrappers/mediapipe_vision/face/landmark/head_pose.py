@@ -5,7 +5,7 @@ from scipy.spatial.transform import Rotation as R
 from typing import Optional, List, Any, Tuple, Dict
 
 from .....src.mediapipe_vision.types import TRANSFORM_MATRIX_LIST
-from .....src.mediapipe_vision.utils.delta_utils import scale_value
+from .....src.utils.math import scale_value
 from ...location_landmark.universal_landmark_nodes import FLOAT_EQUALITY_TOLERANCE # For trigger node comparisons
 
 logger = logging.getLogger(__name__)
