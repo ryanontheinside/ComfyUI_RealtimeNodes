@@ -1,18 +1,19 @@
 """Utility functions for MediaPipe Vision."""
 
-from .download_utils import download_model
-from ...utils.image import convert_to_cv2, convert_to_tensor
+# DEPRECATED: These imports are maintained only for backward compatibility.
+# For new code, please import directly from src.utils 
+
 from ...utils.math import scale_value
+from ...utils.image import convert_to_cv2, convert_to_tensor
 
-# For backward compatibility with existing code
+# Keep only the functions specific to mediapipe_vision
+from .download_utils import download_model
 from .delta_utils import calculate_euclidean_delta
-
-# Maintain backward compatibility with existing imports
-# New code should import directly from src.utils
 
 __all__ = [
     "convert_to_cv2",
     "convert_to_tensor",
     "calculate_euclidean_delta",
-    "scale_value"
+    "scale_value",
+    "download_model"
 ] 

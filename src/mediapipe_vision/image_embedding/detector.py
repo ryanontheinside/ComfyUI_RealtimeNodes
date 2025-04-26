@@ -7,7 +7,8 @@ from mediapipe.tasks.python.core.base_options import BaseOptions
 from typing import List, Optional
 # Import new types
 from ..types import ImageEmbedderResult
-from ..utils.timestamp_provider import TimestampProvider # Import TimestampProvider
+# Import TimestampProvider from the new location
+from ...utils.timing import TimestampProvider
 
 class ImageEmbedder:
     """Generates image embeddings using MediaPipe ImageEmbedder."""

@@ -12,7 +12,7 @@ from typing import List, Tuple, Optional, Dict, Any
 
 # Import needed types
 from ..types import LandmarkPoint, HolisticLandmarksResult
-from ..utils.timestamp_provider import TimestampProvider
+from ...utils.timing import TimestampProvider
 
 class HolisticLandmarkDetector:
     """Detects holistic landmarks combining face, pose and hand tracking.
