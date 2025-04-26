@@ -1,7 +1,5 @@
 # node_wrappers/face/texture_warp.py
 import logging
-import torch
-import numpy as np
 
 logger = logging.getLogger(__name__)
 

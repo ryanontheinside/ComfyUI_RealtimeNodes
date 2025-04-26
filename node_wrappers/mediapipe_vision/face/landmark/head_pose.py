@@ -2,7 +2,7 @@
 import logging
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from typing import Optional, List, Any, Tuple, Dict
+from typing import Optional, Dict
 
 from .....src.mediapipe_vision.types import TRANSFORM_MATRIX_LIST
 from .....src.utils.math import scale_value

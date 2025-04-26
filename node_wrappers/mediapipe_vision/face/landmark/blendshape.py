@@ -1,6 +1,6 @@
 # node_wrappers/face/blendshape.py
 import logging
-from typing import Optional, List, Any, Dict, Tuple
+from typing import Optional
 
 from .....src.mediapipe_vision.types import BLENDSHAPES_LIST # Updated type alias
 from .....src.mediapipe_vision.utils.blendshape_utils import get_blendshape_categories # Utility to get all category names
