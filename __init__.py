@@ -40,7 +40,7 @@ def load_nodes_from_directory(package_path):
                         # Check if it's a ComfyUI node (heuristic: has INPUT_TYPES)
                         if hasattr(obj, "INPUT_TYPES") and callable(obj.INPUT_TYPES):
                             # Exclude base classes/mixins if they are explicitly named or lack a CATEGORY
-                            if not name.endswith("Base") and not name.endswith("Mixin") and hasattr(obj, "CATEGORY"):
+                            if "Base" not in name and not name.endswith("Mixin") and hasattr(obj, "CATEGORY"):
                                 loaded_nodes[name] = obj
 
                                 # Generate display name (similar to original logic)

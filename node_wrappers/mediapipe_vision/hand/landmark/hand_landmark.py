@@ -3,8 +3,8 @@ import logging
 import torch
 
 from .....src.mediapipe_vision.hand_landmark.detector import HandLandmarkDetector
-from ...common.base_detector_node import BaseMediaPipeDetectorNode
-from ...common.model_loader import MediaPipeModelLoaderBaseNode
+from .....src.mediapipe_vision.common.base_detector_node import BaseMediaPipeDetectorNode
+from .....src.mediapipe_vision.common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 

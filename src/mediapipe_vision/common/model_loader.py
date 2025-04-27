@@ -5,7 +5,7 @@ import logging
 import traceback  # For better error logging
 
 # Add import for MEDIAPIPE_MODELS dictionary and the get_model_description function
-from ....src.mediapipe_vision.model_loader import (
+from ..model_loader import (
     MediaPipeModelLoader,
     get_available_models,
     get_model_description,

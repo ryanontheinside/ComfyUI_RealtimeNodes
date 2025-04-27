@@ -3,7 +3,7 @@ import logging
 
 import cv2
 
-from ..common.base_visualization_nodes import BaseDetectionVisualizationNode
+from ....src.mediapipe_vision.common.base_visualization_nodes import BaseDetectionVisualizationNode
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/ObjectDetection/Visualization"
