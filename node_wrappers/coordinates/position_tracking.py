@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import torch
 
-from ...src.coordinates.coordinate_delta import BaseCoordinateDelta
+from ...src.coordinates.coordinate_delta import BaseCoordinateDelta, MAX_POSITION_HISTORY, FLOAT_EQUALITY_TOLERANCE
 
 # TODO: consider moving base nodes to src
 # Import from the new consolidated utilities
