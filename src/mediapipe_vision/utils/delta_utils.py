@@ -1,8 +1,16 @@
+# DEPRECATED: This file is maintained only for backward compatibility.
+# For new code, please import directly from:
+#   src.utils.math
+
+# scale_value has been moved to src/utils/math.py
+# Please update your imports.
+
 import math
 from typing import Optional
 
+from ...utils.math import scale_value
 from ..types import LandmarkPoint # Assuming LandmarkPoint is in src/types.py
-
+#TODO: refactor to common after unified coordinate system
 def calculate_euclidean_delta(p1: Optional[LandmarkPoint], p2: Optional[LandmarkPoint]) -> Optional[float]:
     """Calculates the Euclidean distance between two LandmarkPoint objects."""
     if p1 is None or p2 is None:
@@ -15,21 +23,4 @@ def calculate_euclidean_delta(p1: Optional[LandmarkPoint], p2: Optional[Landmark
     distance = math.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
     return distance
 
-def scale_value(value: Optional[float], 
-                  delta_min: float, delta_max: float, 
-                  output_min: float, output_max: float, 
-                  clamp: bool = True) -> Optional[float]:
-    """Linearly scales a value from one range to another."""
-    if value is None:
-        return None
-    if delta_max == delta_min: # Avoid division by zero
-        return output_min if value <= delta_min else output_max
-        
-    # Scale
-    scaled = output_min + (value - delta_min) * (output_max - output_min) / (delta_max - delta_min)
-    
-    # Clamp
-    if clamp:
-        scaled = max(output_min, min(output_max, scaled))
-        
-    return scaled 
+# scale_value is now imported from utils.math 

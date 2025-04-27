@@ -3,11 +3,11 @@ import logging
 from typing import Optional, List, Any, Dict, Tuple
 
 from .....src.mediapipe_vision.types import BLENDSHAPES_LIST # Updated type alias
-from .....src.mediapipe_vision.utils.misc_utils import get_blendshape_categories # Utility to get all category names
+from .....src.mediapipe_vision.utils.blendshape_utils import get_blendshape_categories # Utility to get all category names
 
 # Import base trigger/control logic if we adapt base classes later, or implement directly for now
 from ...location_landmark.universal_landmark_nodes import FLOAT_EQUALITY_TOLERANCE # For trigger node comparisons
-from .....src.mediapipe_vision.utils.delta_utils import scale_value
+from .....src.utils.math import scale_value
 
 logger = logging.getLogger(__name__)
 

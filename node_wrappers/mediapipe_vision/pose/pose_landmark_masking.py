@@ -6,7 +6,7 @@ import logging
 from typing import List, Dict, Tuple
 
 from ....src.mediapipe_vision.types import PoseLandmarksResult
-from ....src.mediapipe_vision.utils.mask_utils import create_mask_from_points  
+from ....src.utils.image import create_mask_from_points
 # Removed GetImageDimensionsNode import
 
 logger = logging.getLogger(__name__)

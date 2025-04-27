@@ -9,7 +9,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageOps
 import nodes
 import random
 from torchvision import transforms
-from ...src.utils.general_utils import AlwaysEqualProxy
+from ...src.utils.general import AlwaysEqualProxy
 MAX_RESOLUTION = nodes.MAX_RESOLUTION  # Get the same max resolution as core nodes
 
 class DTypeConverter:

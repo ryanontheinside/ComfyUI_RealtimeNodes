@@ -11,7 +11,7 @@ from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.vision import ImageSegmenter
 import platform # Needed for OS check
 import logging
-from ..utils.timestamp_provider import TimestampProvider # Import TimestampProvider
+from ...utils.timing import TimestampProvider
 
 logger = logging.getLogger(__name__)
 

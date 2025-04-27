@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import cv2
 
-from ....src.mediapipe_vision.utils.image_utils import convert_to_cv2, convert_to_tensor
+from ....src.utils.image import convert_to_cv2, convert_to_tensor
 from ..common.base_visualization_nodes import BaseDetectionVisualizationNode
 
 import logging

@@ -15,9 +15,9 @@ from ....src.mediapipe_vision.types import (
     LandmarkPoint, FaceLandmarksResult, HandLandmarksResult, PoseLandmarksResult
 )
 
-# Re-import needed utils if not available globally
-from ....src.mediapipe_vision.utils.delta_utils import scale_value
-from ....src.mediapipe_vision.utils.comfy_utils import AlwaysEqualProxy
+# Import from the new consolidated utilities
+from ....src.utils.math import scale_value
+from ....src.utils.general import AlwaysEqualProxy
 
 logger = logging.getLogger(__name__)
 

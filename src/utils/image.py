@@ -1,6 +1,14 @@
+"""
+Image processing utilities for ComfyUI RealTimeNodes.
+
+Contains functions for converting between different image formats,
+particularly between ComfyUI tensor format (BHWC) and OpenCV format.
+"""
+
 import torch
 import numpy as np
 import cv2
+from typing import List, Union, Tuple
 
 def convert_to_cv2(tensor: torch.Tensor) -> list:
     """Converts a ComfyUI IMAGE tensor (BHWC, float32, 0-1) to a list of cv2 images (BGR, uint8)."""
@@ -42,3 +50,19 @@ def convert_to_tensor(cv2_images) -> torch.Tensor:
     tensor = torch.from_numpy(batch_np)
     
     return tensor
+
+def create_mask_from_points(height: int, width: int, points: List[Tuple[int, int]], device='cpu') -> torch.Tensor:
+    """Creates a binary mask tensor from a list of points using convex hull."""
+    mask = np.zeros((height, width), dtype=np.uint8)
+    if len(points) < 3:
+        return torch.from_numpy(mask).float().unsqueeze(0).to(device)
+        
+    try:
+        np_points = np.array(points, dtype=np.int32)
+        hull = cv2.convexHull(np_points)
+        cv2.fillPoly(mask, [hull], 1)
+    except Exception as e:
+        return torch.from_numpy(mask).float().unsqueeze(0).to(device)
+        
+    mask_tensor = torch.from_numpy(mask).float().unsqueeze(0).to(device)
+    return mask_tensor 

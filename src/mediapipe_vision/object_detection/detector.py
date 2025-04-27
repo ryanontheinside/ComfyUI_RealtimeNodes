@@ -7,7 +7,7 @@ from mediapipe.tasks.python.core.base_options import BaseOptions
 from typing import List
 # Import new types
 from ..types import ObjectDetectionResult, ObjectDetectionCategory, BoundingBox
-from ..utils.timestamp_provider import TimestampProvider # Import TimestampProvider
+from ...utils.timing import TimestampProvider
 
 class ObjectDetector:
     """Detects objects using MediaPipe ObjectDetector."""

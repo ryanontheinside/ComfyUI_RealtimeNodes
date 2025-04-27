@@ -1,3 +1,4 @@
+import logging
 import mediapipe as mp
 import numpy as np
 import torch
@@ -11,7 +12,7 @@ from mediapipe.tasks.python.components.containers import keypoint
 
 from typing import List, Optional
 from ..types import PointOfInterest
-from ..utils.timestamp_provider import TimestampProvider
+from ...utils.timing import TimestampProvider
 
 import logging
 logger = logging.getLogger(__name__)

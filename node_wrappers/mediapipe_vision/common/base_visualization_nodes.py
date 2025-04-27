@@ -3,7 +3,7 @@ from typing import List, Dict, Tuple, Any, Optional, Type
 import cv2
 import numpy as np
 
-from ....src.mediapipe_vision.utils.image_utils import convert_to_cv2, convert_to_tensor
+from ....src.utils.image import convert_to_cv2, convert_to_tensor
 
 logger = logging.getLogger(__name__)
 

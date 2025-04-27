@@ -1,6 +1,6 @@
 from ....src.realtimenodes.control_base import ControlNodeBase
 import copy
-from ....src.utils.general_utils import AlwaysEqualProxy
+from ....src.utils.general import AlwaysEqualProxy
 
 class StateResetNode(ControlNodeBase):
     """Node that resets all control node states when triggered"""
