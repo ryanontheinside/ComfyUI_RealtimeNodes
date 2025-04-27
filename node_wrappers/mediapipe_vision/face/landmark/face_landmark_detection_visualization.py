@@ -4,7 +4,7 @@ from typing import Any, List, Optional
 
 import mediapipe as mp
 
-from ...common.base_visualization_nodes import BaseLandmarkVisualizationNode
+from .....src.mediapipe_vision.common.base_visualization_nodes import BaseLandmarkVisualizationNode
 
 logger = logging.getLogger(__name__)
 

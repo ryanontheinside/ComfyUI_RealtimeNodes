@@ -3,8 +3,8 @@ import logging
 import torch
 
 from .....src.mediapipe_vision.face_detection.detector import FaceDetector
-from ...common.base_detector_node import BaseMediaPipeDetectorNode
-from ...common.model_loader import MediaPipeModelLoaderBaseNode
+from .....src.mediapipe_vision.common.base_detector_node import BaseMediaPipeDetectorNode
+from .....src.mediapipe_vision.common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Face/FaceDetection"

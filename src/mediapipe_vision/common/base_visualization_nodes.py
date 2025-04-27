@@ -3,7 +3,7 @@ from typing import Any, List, Optional
 
 import cv2
 
-from ....src.utils.image import convert_to_cv2, convert_to_tensor
+from ...utils.image import convert_to_cv2, convert_to_tensor
 
 logger = logging.getLogger(__name__)
 

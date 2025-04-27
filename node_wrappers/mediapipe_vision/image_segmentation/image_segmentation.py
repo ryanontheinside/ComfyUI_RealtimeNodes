@@ -8,10 +8,10 @@ import torch
 
 # Imports from this project
 from ....src.mediapipe_vision.image_segmentation.segmenter import ImageSegmenter
-from ..common.base_detector_node import BaseMediaPipeDetectorNode
+from ....src.mediapipe_vision.common.base_detector_node import BaseMediaPipeDetectorNode
 
 # Import Base Classes
-from ..common.model_loader import MediaPipeModelLoaderBaseNode
+from ....src.mediapipe_vision.common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 

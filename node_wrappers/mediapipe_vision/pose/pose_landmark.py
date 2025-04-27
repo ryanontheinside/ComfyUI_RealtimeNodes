@@ -3,8 +3,8 @@ import logging
 import torch
 
 from ....src.mediapipe_vision.pose_landmark.detector import PoseLandmarkDetector
-from ..common.base_detector_node import BaseMediaPipeDetectorNode
-from ..common.model_loader import MediaPipeModelLoaderBaseNode
+from ....src.mediapipe_vision.common.base_detector_node import BaseMediaPipeDetectorNode
+from ....src.mediapipe_vision.common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Pose"
@@ -39,7 +39,7 @@ class MediaPipePoseLandmarkerNode(BaseMediaPipeDetectorNode):
     @classmethod
     def INPUT_TYPES(cls):
         # Start with the base inputs from the parent class
-        inputs = super().INPUT_TYPES()
+        inputs = super().INPUT_TYPES() 
 
         # Add pose-specific parameters
         inputs["required"].update(

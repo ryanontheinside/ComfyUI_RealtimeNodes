@@ -5,7 +5,7 @@ import torch
 from .....src.mediapipe_vision.face_stylization.detector import FaceStylizer
 
 # Import Base Loader and Detector
-from ...common.model_loader import MediaPipeModelLoaderBaseNode
+from .....src.mediapipe_vision.common.model_loader import MediaPipeModelLoaderBaseNode
 
 logger = logging.getLogger(__name__)
 _category = "Realtime Nodes/MediaPipe Vision/Face/FaceStylization"
@@ -86,7 +86,7 @@ class MediaPipeFaceStylizerNode:
 
 # --- Mappings ---
 NODE_CLASS_MAPPINGS = {
-    "MediaPipeFaceStylizerModelLoader": MediaPipeFaceStylizerModelLoaderNode,
+    "MediaPipeFaceStylizerModelLoader": MediaPipeFaceStylizerModelLoaderNode, 
     "MediaPipeFaceStylizer": MediaPipeFaceStylizerNode,
 }
 
