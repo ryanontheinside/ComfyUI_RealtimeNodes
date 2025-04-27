@@ -6,5 +6,4 @@ to this is released, this module will be updated to use the new api.
 """
 
 # Import modules to ensure they're registered
-from . import holistic_landmark
-from . import holistic_landmark_visualization 
+from . import holistic_landmark, holistic_landmark_visualization

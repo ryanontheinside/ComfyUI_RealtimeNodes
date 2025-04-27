@@ -4,6 +4,7 @@ Timing and timestamp utilities for RealTimeNodes.
 
 import time
 
+
 class TimestampProvider:
     """
     Provides real-time, monotonic timestamps in milliseconds.
@@ -11,6 +12,7 @@ class TimestampProvider:
     This ensures timestamps are always increasing while staying aligned with real elapsed time.
     Useful for any process that requires monotonically increasing time values.
     """
+
     def __init__(self):
         self._start_time = time.time()
         self._last_timestamp = 0
@@ -21,4 +23,4 @@ class TimestampProvider:
         if now <= self._last_timestamp:
             now = self._last_timestamp + 1
         self._last_timestamp = now
-        return now 
+        return now

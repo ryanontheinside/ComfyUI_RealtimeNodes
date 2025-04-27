@@ -1,14 +1,16 @@
 # visualize_face.py
+import logging
+from typing import Any, List, Optional
+
 import mediapipe as mp
-from typing import Optional, List, Any
 
 from ...common.base_visualization_nodes import BaseLandmarkVisualizationNode
 
-import logging
 logger = logging.getLogger(__name__)
 
 # Define standard face connections
 FACE_CONNECTIONS = mp.solutions.face_mesh.FACEMESH_TESSELATION
+
 
 class VisualizeFaceLandmarks(BaseLandmarkVisualizationNode):
     LANDMARKS_TYPE = "FACE_LANDMARKS"
@@ -21,15 +23,12 @@ class VisualizeFaceLandmarks(BaseLandmarkVisualizationNode):
     SUPPORTS_VISIBILITY = False
     CATEGORY = "Realtime Nodes/MediaPipe Vision/Face/FaceLandmark/Visualization"
     DESCRIPTION = "Visualizes facial landmarks by drawing a mesh of points and connections on the face. Creates a detailed facial wireframe that shows the precise contours and features of detected faces."
-    
+
     def get_landmark_list(self, detection_result: Any) -> Optional[List[Any]]:
-            return detection_result
+        return detection_result
+
 
 # Node registration
-NODE_CLASS_MAPPINGS = {
-    "VisualizeFaceLandmarks": VisualizeFaceLandmarks
-}
+NODE_CLASS_MAPPINGS = {"VisualizeFaceLandmarks": VisualizeFaceLandmarks}
 
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "VisualizeFaceLandmarks": "Visualize Face Landmarks (MediaPipe)"
-} 
+NODE_DISPLAY_NAME_MAPPINGS = {"VisualizeFaceLandmarks": "Visualize Face Landmarks (MediaPipe)"}

@@ -1,1 +1,1 @@
-"""Hand Landmark Detection implementation using MediaPipe.""" 
+"""Hand Landmark Detection implementation using MediaPipe."""

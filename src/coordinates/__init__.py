@@ -9,4 +9,4 @@ with support for single values, batches, and point collections.
 from .coordinate_system import CoordinateSystem, Point, PointList
 from .drawing_engine import DrawingEngine
 
-__all__ = ['CoordinateSystem', 'Point', 'PointList', 'DrawingEngine'] 
+__all__ = ["CoordinateSystem", "Point", "PointList", "DrawingEngine"]

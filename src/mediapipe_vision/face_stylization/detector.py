@@ -3,8 +3,9 @@ import numpy as np
 import torch
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from typing import List, Optional
+
 from ...utils.timing import TimestampProvider
+
 
 class FaceStylizer:
     """Applies stylization to faces using MediaPipe FaceStylizer."""
@@ -27,12 +28,12 @@ class FaceStylizer:
         options = vision.FaceStylizerOptions(
             base_options=base_options
             # running_mode=vision.RunningMode.VIDEO # Not supported
-            )
+        )
         self.current_options = ()
         self._timestamp_provider = TimestampProvider()
         return vision.FaceStylizer.create_from_options(options)
 
-    def stylize(self, image: torch.Tensor) -> torch.Tensor: # Output is IMAGE
+    def stylize(self, image: torch.Tensor) -> torch.Tensor:  # Output is IMAGE
         """Applies face stylization to the input image tensor(s)."""
         if image.dim() != 4:
             raise ValueError("Input tensor must be in BHWC format.")
@@ -44,24 +45,24 @@ class FaceStylizer:
         batch_results = []
 
         for i in range(batch_size):
-            img_tensor = image[i] # HWC
+            img_tensor = image[i]  # HWC
             np_image = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np_image)
 
             stylization_result = self.detector_instance.stylize(mp_image)
-            
+
             output_image_tensor = None
             if stylization_result:
-                 # Convert MediaPipe Image back to NumPy (HWC, uint8)
-                 stylized_np = stylization_result.numpy_view()
-                 # Convert to float tensor (HWC, 0-1)
-                 output_image_tensor = torch.from_numpy(stylized_np).float().div(255.0)
+                # Convert MediaPipe Image back to NumPy (HWC, uint8)
+                stylized_np = stylization_result.numpy_view()
+                # Convert to float tensor (HWC, 0-1)
+                output_image_tensor = torch.from_numpy(stylized_np).float().div(255.0)
             else:
-                 # Handle cases where stylization fails (e.g., no face detected)
-                 # Return original image tensor for this batch item
-                 output_image_tensor = img_tensor
-            
+                # Handle cases where stylization fails (e.g., no face detected)
+                # Return original image tensor for this batch item
+                output_image_tensor = img_tensor
+
             batch_results.append(output_image_tensor)
 
         output_batch_tensor = torch.stack(batch_results, dim=0)
-        return output_batch_tensor 
+        return output_batch_tensor

@@ -1,1 +1,1 @@
-"""Pose Landmark Detection implementation using MediaPipe.""" 
+"""Pose Landmark Detection implementation using MediaPipe."""

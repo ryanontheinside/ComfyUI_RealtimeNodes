@@ -1,1 +1,1 @@
-"""Gesture Recognition implementation using MediaPipe.""" 
+"""Gesture Recognition implementation using MediaPipe."""

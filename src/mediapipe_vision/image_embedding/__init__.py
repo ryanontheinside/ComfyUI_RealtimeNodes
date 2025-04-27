@@ -1,1 +1,1 @@
-"""Image Embedding implementation using MediaPipe.""" 
+"""Image Embedding implementation using MediaPipe."""

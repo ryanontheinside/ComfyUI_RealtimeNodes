@@ -1,1 +1,1 @@
-"""Object Detection implementation using MediaPipe.""" 
+"""Object Detection implementation using MediaPipe."""
