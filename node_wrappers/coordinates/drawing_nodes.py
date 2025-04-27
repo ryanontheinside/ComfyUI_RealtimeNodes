@@ -2,7 +2,8 @@ import torch
 import logging
 from typing import Union, List
 
-from ....src.mediapipe_vision.location_landmark.drawing_engine import DrawingEngine
+from ...src.coordinates import CoordinateSystem
+from ...src.coordinates import DrawingEngine
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,10 @@ class RTDrawPointsNode:
     def draw_points(self, image: torch.Tensor, x: Union[float, List[float]], y: Union[float, List[float]],
                    radius: int, color_hex: str, is_normalized: bool = True, batch_mapping: str = "broadcast"):
         """Draw points efficiently using the DrawingEngine."""
+        # Use the coordinate system to ensure proper handling
+        space = CoordinateSystem.NORMALIZED if is_normalized else CoordinateSystem.PIXEL
+        dimensions = CoordinateSystem.get_dimensions_from_tensor(image)
+        
         drawing_engine = DrawingEngine()
         return (drawing_engine.draw_points(
             image=image,
@@ -89,6 +94,10 @@ class RTDrawLinesNode:
                   draw_label: bool = False, label_text: str = "Line",
                   label_position: str = "Midpoint", font_scale: float = 0.5):
         """Draw lines efficiently using the DrawingEngine."""
+        # Use the coordinate system to ensure proper handling
+        space = CoordinateSystem.NORMALIZED if is_normalized else CoordinateSystem.PIXEL
+        dimensions = CoordinateSystem.get_dimensions_from_tensor(image)
+        
         drawing_engine = DrawingEngine()
         return (drawing_engine.draw_lines(
             image=image,
@@ -145,6 +154,10 @@ class RTDrawPolygonNode:
                     vertex_radius: int = 3, draw_label: bool = False,
                     label_text: str = "Polygon", font_scale: float = 0.5):
         """Draw polygon efficiently using the DrawingEngine."""
+        # Use the coordinate system to ensure proper handling
+        space = CoordinateSystem.NORMALIZED if is_normalized else CoordinateSystem.PIXEL
+        dimensions = CoordinateSystem.get_dimensions_from_tensor(image)
+        
         drawing_engine = DrawingEngine()
         return (drawing_engine.draw_polygon(
             image=image,
@@ -186,20 +199,15 @@ class RTCoordinateConverterNode:
 
     def convert_coordinates(self, x: Union[float, List[float]], y: Union[float, List[float]],
                            image_for_dimensions: torch.Tensor, mode: str):
-        """Convert coordinates efficiently using DrawingEngine methods."""
-        if image_for_dimensions.dim() != 4:
-            logger.error("Input image must be BHWC format.")
-            return ([0.0] * len(x), [0.0] * len(y)) if isinstance(x, list) else (0.0, 0.0)
-
-        _, height, width, _ = image_for_dimensions.shape
-        drawing_engine = DrawingEngine()
+        """Convert coordinates using the new coordinate system."""
+        dimensions = CoordinateSystem.get_dimensions_from_tensor(image_for_dimensions)
         
         if mode == "Pixel to Normalized":
-            x_out = drawing_engine.normalize_coords(x, width)
-            y_out = drawing_engine.normalize_coords(y, height)
+            x_out = CoordinateSystem.normalize(x, dimensions[0], CoordinateSystem.PIXEL)
+            y_out = CoordinateSystem.normalize(y, dimensions[1], CoordinateSystem.PIXEL)
         else:  # "Normalized to Pixel"
-            x_out = drawing_engine.denormalize_coords(x, width)
-            y_out = drawing_engine.denormalize_coords(y, height)
+            x_out = CoordinateSystem.denormalize(x, dimensions[0], CoordinateSystem.PIXEL)
+            y_out = CoordinateSystem.denormalize(y, dimensions[1], CoordinateSystem.PIXEL)
             
         return (x_out, y_out)
 
