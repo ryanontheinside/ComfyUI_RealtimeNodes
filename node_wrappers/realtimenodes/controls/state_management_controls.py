@@ -156,3 +156,5 @@ class SetStateNode(ControlNodeBase):
             print(f"[State Node] Error storing value: {str(e)}")
 
         return (value,)
+
+
