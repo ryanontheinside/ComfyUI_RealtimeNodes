@@ -2,11 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from ....src.utils.image import gaussian_blur_2d, flow_to_rgb
+from ....src.utils.image import gaussian_blur_2d
 from ....src.utils.realtime_flownets import RealTimeFlowNet
 #NOTE: this is totally experimental and grounded in very little research.
-
-
 
 class TemporalNetV2Preprocessor:
     @classmethod
