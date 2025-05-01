@@ -14,7 +14,7 @@ import math
 import torch
 import torch.nn.functional as F
 
-def flow_to_rgb(self, flow):
+def flow_to_rgb(flow):
     """
     Convert optical flow to RGB visualization similar to torchvision's flow_to_image
     

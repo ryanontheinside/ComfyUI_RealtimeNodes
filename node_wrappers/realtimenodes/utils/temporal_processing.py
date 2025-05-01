@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from ....src.utils.image import gaussian_blur_2d
+from ....src.utils.image import gaussian_blur_2d, flow_to_rgb
 from ....src.utils.realtime_flownets import RealTimeFlowNet
 #NOTE: this is totally experimental and grounded in very little research.
 
@@ -52,7 +52,7 @@ class TemporalNetV2Preprocessor:
         
         # Visualize flow as RGB (similar to flow_to_image in torchvision)
         # This converts 2-channel flow to 3-channel RGB visualization
-        flow_rgb = self.flow_to_rgb(flow)
+        flow_rgb = flow_to_rgb(flow)
         
         # Convert flow back to BHWC format
         flow_rgb = flow_rgb.movedim(1, -1)
