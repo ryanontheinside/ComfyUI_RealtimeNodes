@@ -9,6 +9,7 @@ app.registerExtension({
             // Store webcam stream at extension level to avoid reinitializing
             let webcamStream = null;
             let webcamVideo = null;
+            let lastCapture = null;
             
             // Initialize webcam once for all nodes
             const initWebcam = async () => {
@@ -85,13 +86,18 @@ app.registerExtension({
                                 // All frames captured
                                 console.log(`Completed capture of ${frames.length} frames`);
                                 
-                                resolve({
+                                const result = {
                                     frames: frames,
                                     width: canvas.width,
                                     height: canvas.height,
                                     duration: duration,
                                     fps: fps
-                                });
+                                };
+                                
+                                // Store for potential reuse
+                                lastCapture = result;
+                                
+                                resolve(result);
                             }
                         };
                         
@@ -132,6 +138,13 @@ app.registerExtension({
                 const canvas = document.createElement("canvas");
                 
                 camera.serializeValue = async () => {
+                    // Check if we should reuse previous capture
+                    const captureOnQueueWidget = this.widgets.find(w => w.name === "capture_on_queue");
+                    if (!captureOnQueueWidget.value && lastCapture) {
+                        console.log("Reusing previous capture");
+                        return JSON.stringify(lastCapture);
+                    }
+                    
                     // Only initialize webcam when actually needed
                     if (!webcamVideo || webcamVideo.paused || webcamVideo.readyState !== 4) {
                         // console.log("Initializing webcam for first use...");
@@ -158,11 +171,20 @@ app.registerExtension({
                         ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
                         
                         const dataUrl = canvas.toDataURL("image/png");
+                        
+                        // Store for potential reuse
+                        lastCapture = {
+                            frames: [dataUrl],
+                            width: canvas.width,
+                            height: canvas.height,
+                            duration: 0,
+                            fps: 30
+                        };
+                        
                         return dataUrl;
                     } 
                     // Video capture mode - capture frames
                     else {
-                        
                         // Capture frames
                         const captureResult = await captureFrames(recordSeconds);
                         
