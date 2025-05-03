@@ -69,7 +69,8 @@ class FastWebcamCapture:
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE", "INT")
+    RETURN_NAMES = ("image", "frame_count")
     FUNCTION = "process_capture"
 
     CATEGORY = "image"
@@ -110,7 +111,7 @@ class FastWebcamCapture:
                 # ComfyUI expects BHWC format
                 image_tensor = torch.from_numpy(image_np)[None, ...]
                 
-                return (image_tensor,)
+                return (image_tensor, 1)
                 
             # JSON frames data from sequence capture
             elif image.startswith("{") and "frames" in image:
@@ -164,7 +165,7 @@ class FastWebcamCapture:
                     
                     print(f"Final video tensor shape: {video_tensor.shape}")
                     
-                    return (video_tensor,)
+                    return (video_tensor, len(frames))
                     
                 except Exception as e:
                     import traceback
