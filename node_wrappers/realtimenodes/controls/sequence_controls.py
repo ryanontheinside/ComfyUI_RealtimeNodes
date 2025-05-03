@@ -32,14 +32,15 @@ class SequenceControlBase(ControlNodeBase):
         return inputs
 
     def update_sequence_base(self, values: list, steps_per_item: int, sequence_mode: str, batch_size: int = 1, always_execute: bool = True):
-        # Initialize or get state
-        state = self.get_state(
-            {
-                "current_index": 0,
-                "step_counter": 0,
-                "direction": 1,  # 1 for forward, -1 for reverse (used in pingpong)
-            }
-        )
+        # Define default state
+        default_state = {
+            "current_index": 0,
+            "step_counter": 0,
+            "direction": 1,  # 1 for forward, -1 for reverse (used in pingpong)
+        }
+        
+        # Initialize or get state - make sure to use the default state
+        state = self.get_state(default_state)
 
         if not values:
             if batch_size > 1:
@@ -48,12 +49,20 @@ class SequenceControlBase(ControlNodeBase):
 
         # Fast path for batch_size=1 (real-time case)
         if batch_size == 1:
-            # Update step counter
+            # Update step counter (ensure it exists first)
+            if "step_counter" not in state:
+                state["step_counter"] = 0
             state["step_counter"] += 1
 
             # Check if we should move to next item
             if state["step_counter"] >= steps_per_item:
                 state["step_counter"] = 0
+
+                # Ensure other state values exist
+                if "current_index" not in state:
+                    state["current_index"] = 0
+                if "direction" not in state:
+                    state["direction"] = 1
 
                 # Update index based on sequence mode
                 if sequence_mode == "forward":
@@ -77,8 +86,16 @@ class SequenceControlBase(ControlNodeBase):
             return (values[state["current_index"]],)
         
         # Batch processing path
-        # Update step counter
+        # Update step counter (ensure it exists first)
+        if "step_counter" not in state:
+            state["step_counter"] = 0
         state["step_counter"] += 1
+
+        # Ensure other state values exist
+        if "current_index" not in state:
+            state["current_index"] = 0
+        if "direction" not in state:
+            state["direction"] = 1
 
         # Check if we should move to next item
         if state["step_counter"] >= steps_per_item:
