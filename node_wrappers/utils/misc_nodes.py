@@ -66,6 +66,13 @@ class FastWebcamCapture:
                         "tooltip": "Length of video to record in seconds. 0 means capture a single image (no video)."
                     }
                 ),
+                "capture_on_queue": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "When enabled, capture new frames on each queue. When disabled, reuse previously captured video."
+                    }
+                ),
             }
         }
 
@@ -75,7 +82,11 @@ class FastWebcamCapture:
 
     CATEGORY = "image"
 
-    def process_capture(self, image, record_seconds):
+    def __init__(self):
+        self.last_capture = None
+        self.last_frame_count = 0
+
+    def process_capture(self, image, record_seconds, capture_on_queue):
         """
         Process a webcam image or video at native resolution.
         
@@ -83,6 +94,11 @@ class FastWebcamCapture:
         If record_seconds > 0, it will record a video for the specified duration.
         For resizing or cropping, use standard ComfyUI nodes after this one.
         """
+        # If capture_on_queue is disabled and we have a previous capture, reuse it
+        if not capture_on_queue and self.last_capture is not None:
+            print("Reusing previous capture")
+            return (self.last_capture, self.last_frame_count)
+
         import torch
         import numpy as np
         import json
@@ -110,6 +126,10 @@ class FastWebcamCapture:
                 # Add batch dimension and convert to torch tensor
                 # ComfyUI expects BHWC format
                 image_tensor = torch.from_numpy(image_np)[None, ...]
+                
+                # Store for potential reuse
+                self.last_capture = image_tensor
+                self.last_frame_count = 1
                 
                 return (image_tensor, 1)
                 
@@ -164,6 +184,10 @@ class FastWebcamCapture:
                         raise ValueError(f"Unexpected tensor shape: {video_tensor.shape}. Expected 4D [frames, H, W, C]")
                     
                     print(f"Final video tensor shape: {video_tensor.shape}")
+                    
+                    # Store for potential reuse
+                    self.last_capture = video_tensor
+                    self.last_frame_count = len(frames)
                     
                     return (video_tensor, len(frames))
                     
