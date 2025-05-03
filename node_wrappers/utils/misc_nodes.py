@@ -55,9 +55,7 @@ class FastWebcamCapture:
         return {
             "required": {
                 "image": ("WEBCAM", {}),
-                "width": ("INT", {"default": 640, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
-                "height": ("INT", {"default": 480, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
-                "capture_on_queue": ("BOOLEAN", {"default": True}),
+                "capture_on_queue": ("BOOLEAN", {"default": True, "tooltip": "Whether to capture the frame when the node is queued"}),
             }
         }
 
@@ -66,7 +64,13 @@ class FastWebcamCapture:
 
     CATEGORY = "image"
 
-    def process_capture(self, image, width, height, capture_on_queue):
+    def process_capture(self, image, capture_on_queue):
+        """
+        Process a webcam image at native resolution.
+        
+        This node simply captures the webcam feed at its native resolution.
+        For resizing or cropping, use standard ComfyUI nodes after this one.
+        """
         # Check if we got a data URL
         if isinstance(image, str) and image.startswith("data:image/"):
             # Extract the base64 data after the comma
@@ -75,15 +79,12 @@ class FastWebcamCapture:
             # Convert base64 to PIL Image
             buffer = BytesIO(base64.b64decode(base64_data))
             pil_image = Image.open(buffer).convert("RGB")
+            
+            # Log the image size we're receiving from the webcam
+            print(f"Webcam image size: {pil_image.width}x{pil_image.height}")
 
             # Convert PIL to numpy array
             image = np.array(pil_image)
-
-            # Handle resize if requested
-            if width > 0 and height > 0:
-                import cv2
-
-                image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
 
             # Convert to float32 and normalize to 0-1 range
             image = image.astype(np.float32) / 255.0

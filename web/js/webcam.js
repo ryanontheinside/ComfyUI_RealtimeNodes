@@ -66,9 +66,6 @@ app.registerExtension({
                 const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
                 
                 const camera = this.widgets.find((w) => w.name === "image");
-                const w = this.widgets.find((w) => w.name === "width");
-                const h = this.widgets.find((w) => w.name === "height");
-                
                 const canvas = document.createElement("canvas");
                 
                 camera.serializeValue = async () => {
@@ -82,20 +79,19 @@ app.registerExtension({
                     }
                     
                     console.log("Capturing frame from video:", {
-                        paused: webcamVideo.paused,
-                        readyState: webcamVideo.readyState,
                         videoWidth: webcamVideo.videoWidth,
                         videoHeight: webcamVideo.videoHeight
                     });
                     
-                    canvas.width = w.value || webcamVideo.videoWidth || 640;
-                    canvas.height = h.value || webcamVideo.videoHeight || 480;
+                    // Always use native webcam resolution
+                    canvas.width = webcamVideo.videoWidth;
+                    canvas.height = webcamVideo.videoHeight;
                     
                     const ctx = canvas.getContext("2d");
                     ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
                     
                     const dataUrl = canvas.toDataURL("image/png");
-                    // console.log("Successfully captured and converted frame to data URL");
+                    console.log("Captured frame at native resolution:", canvas.width, "x", canvas.height);
                     return dataUrl;
                 };
 
