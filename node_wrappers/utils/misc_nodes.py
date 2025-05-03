@@ -1183,25 +1183,27 @@ class RoundNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "value": ("FLOAT", {"default": 0.0, "tooltip": "Float value to round"}),
-                "decimal_places": (
+                "int_or_float": (AlwaysEqualProxy("*"), {"default": 0.0, "tooltip": "Float or integer value to round"}),
+                "places": (
                     "INT",
                     {"default": 2, "min": 0, "max": 10, "step": 1, "tooltip": "Number of decimal places to round to"},
                 ),
             }
         }
 
-    RETURN_TYPES = ("FLOAT",)
-    RETURN_NAMES = ("rounded_value",)
+    RETURN_TYPES = ("FLOAT","INT")
+    RETURN_NAMES = ("rounded_value","rounded_int")
     FUNCTION = "round_value"
     CATEGORY = "utils"
 
-    def round_value(self, value, decimal_places):
-        if isinstance(value, (list, tuple, np.ndarray, torch.Tensor)):
-            rounded = [round(v, decimal_places) for v in value]
+    def round_value(self, int_or_float, places):
+        if isinstance(int_or_float, (list, tuple, np.ndarray, torch.Tensor)):
+            rounded = [round(v, places) for v in int_or_float]
+            rounded_int = [int(round(v)) for v in int_or_float]
         else:
-            rounded = round(value, decimal_places)
-        return (rounded,)
+            rounded = round(int_or_float, places)
+            rounded_int = int(round(int_or_float))
+        return (rounded, rounded_int)
 
 
 class RenormalizeFloat:
