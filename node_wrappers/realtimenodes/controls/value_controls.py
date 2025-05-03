@@ -43,7 +43,18 @@ class ValueControlBase(ControlNodeBase):
         return self.update_value_base(*args, **kwargs)
 
     def update_value_base(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, batch_size=1, always_execute=True):
-        state = self.get_state({"current_value": None, "phase": 0.0})
+        # Define default state
+        default_state = {"current_value": None, "phase": 0.0}
+        
+        # Initialize or get state
+        state = self.get_state(default_state)
+        
+        # Ensure state keys exist
+        if "current_value" not in state:
+            state["current_value"] = None
+        if "phase" not in state:
+            state["phase"] = 0.0
+            
         pattern = MOVEMENT_PATTERNS[movement_type]
 
         # Fast path for batch_size=1 (real-time case)
@@ -256,7 +267,14 @@ class StringControl(ControlNodeBase):
                 return ([""] * batch_size,)
             return ("",)
 
-        state = self.get_state({"phase": 0.0})
+        # Define default state
+        default_state = {"phase": 0.0}
+        
+        # Get state and ensure keys exist
+        state = self.get_state(default_state)
+        if "phase" not in state:
+            state["phase"] = 0.0
+            
         pattern = MOVEMENT_PATTERNS[movement_type]
 
         # Update phase
