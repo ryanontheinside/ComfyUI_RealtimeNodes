@@ -24,6 +24,16 @@ class ValueControlBase(ControlNodeBase):
                     list(MOVEMENT_PATTERNS.keys()),
                     {"default": "sine", "tooltip": "Pattern of value changes over time"},
                 ),
+                "batch_size": (
+                    "INT",
+                    {
+                        "default": 1,
+                        "min": 1,
+                        "max": 1000,
+                        "step": 1,
+                        "tooltip": "Number of values to generate in batch",
+                    },
+                ),
             }
         )
         return inputs
@@ -32,27 +42,59 @@ class ValueControlBase(ControlNodeBase):
         """Implement abstract method from ControlNodeBase"""
         return self.update_value_base(*args, **kwargs)
 
-    def update_value_base(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute=True):
+    def update_value_base(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, batch_size=1, always_execute=True):
         state = self.get_state({"current_value": None, "phase": 0.0})
+        pattern = MOVEMENT_PATTERNS[movement_type]
 
+        # Fast path for batch_size=1 (real-time case)
+        if batch_size == 1:
+            # Initialize if this is the first run
+            if state["current_value"] is None:
+                state["current_value"] = starting_value
+                self.set_state(state)
+                return (starting_value,)
+
+            # Update phase
+            state["phase"] = (state["phase"] + 1 / steps_per_cycle) % 1.0
+            
+            # Calculate new value
+            new_value = pattern.calculate(state["phase"], minimum_value, maximum_value)
+            
+            # Update state
+            state["current_value"] = new_value
+            self.set_state(state)
+            
+            return (new_value,)
+        
+        # Batch processing path
         # Initialize if this is the first run
         if state["current_value"] is None:
             state["current_value"] = starting_value
             self.set_state(state)
-            return (starting_value,)
+            
+            # Generate N values starting from starting_value
+            values = []
+            for i in range(batch_size):
+                phase = (i / batch_size) % 1.0
+                value = pattern.calculate(phase, minimum_value, maximum_value)
+                values.append(value)
+            return (values,)
 
         # Update phase
         state["phase"] = (state["phase"] + 1 / steps_per_cycle) % 1.0
 
-        # Calculate new value using pattern
-        pattern = MOVEMENT_PATTERNS[movement_type]
-        new_value = pattern.calculate(state["phase"], minimum_value, maximum_value)
-
-        # Update state
-        state["current_value"] = new_value
+        # Generate N different values based on the current phase
+        values = []
+        for i in range(batch_size):
+            phase = (state["phase"] + (i / batch_size)) % 1.0
+            value = pattern.calculate(phase, minimum_value, maximum_value)
+            values.append(value)
+            
+        # Update state with the last value
+        state["current_value"] = values[-1]
         self.set_state(state)
-
-        return (new_value,)
+        
+        return (values,)
 
 
 class FloatControl(ValueControlBase):
@@ -101,8 +143,8 @@ class FloatControl(ValueControlBase):
     FUNCTION = "update_value"
     CATEGORY = "Realtime Nodes/control/value"
 
-    def update_value(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute=True):
-        return self.update_value_base(maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute)
+    def update_value(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, batch_size=1, always_execute=True):
+        return self.update_value_base(maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, batch_size, always_execute)
 
 
 class IntControl(ValueControlBase):
@@ -151,8 +193,10 @@ class IntControl(ValueControlBase):
     FUNCTION = "update_value"
     CATEGORY = "Realtime Nodes/control/value"
 
-    def update_value(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute=True):
-        result = self.update_value_base(maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, always_execute)
+    def update_value(self, maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, batch_size=1, always_execute=True):
+        result = self.update_value_base(maximum_value, minimum_value, starting_value, steps_per_cycle, movement_type, batch_size, always_execute)
+        if batch_size > 1:
+            return ([int(round(x)) for x in result[0]],)
         return (int(round(result[0])),)
 
 
@@ -186,6 +230,16 @@ class StringControl(ControlNodeBase):
                     list(MOVEMENT_PATTERNS.keys()),
                     {"default": "sine", "tooltip": "Pattern of value changes over time"},
                 ),
+                "batch_size": (
+                    "INT",
+                    {
+                        "default": 1,
+                        "min": 1,
+                        "max": 1000,
+                        "step": 1,
+                        "tooltip": "Number of values to generate in batch",
+                    },
+                ),
             }
         )
         return inputs
@@ -194,23 +248,35 @@ class StringControl(ControlNodeBase):
     FUNCTION = "update"
     CATEGORY = "Realtime Nodes/control/value"
 
-    def update(self, strings, steps_per_cycle, movement_type, always_execute=True):
+    def update(self, strings, steps_per_cycle, movement_type, batch_size=1, always_execute=True):
         # Split the input strings into a list
         string_list = [s.strip() for s in strings.split("\n") if s.strip()]
         if not string_list:
+            if batch_size > 1:
+                return ([""] * batch_size,)
             return ("",)
 
         state = self.get_state({"phase": 0.0})
+        pattern = MOVEMENT_PATTERNS[movement_type]
 
         # Update phase
         state["phase"] = (state["phase"] + 1 / steps_per_cycle) % 1.0
-
-        # Calculate index using pattern
-        pattern = MOVEMENT_PATTERNS[movement_type]
-        index_float = pattern.calculate(state["phase"], 0, len(string_list) - 1)
-        index = int(round(index_float)) % len(string_list)
-
+        
+        # Fast path for real-time case (batch_size=1)
+        if batch_size == 1:
+            index_float = pattern.calculate(state["phase"], 0, len(string_list) - 1)
+            index = int(round(index_float)) % len(string_list)
+            self.set_state(state)
+            return (string_list[index],)
+        
+        # Batch processing path
+        values = []
+        for i in range(batch_size):
+            phase = (state["phase"] + (i / batch_size)) % 1.0
+            index_float = pattern.calculate(phase, 0, len(string_list) - 1)
+            index = int(round(index_float)) % len(string_list)
+            values.append(string_list[index])
+            
         # Update state
         self.set_state(state)
-
-        return (string_list[index],)
+        return (values,)
