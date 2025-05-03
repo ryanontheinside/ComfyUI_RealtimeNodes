@@ -9,8 +9,6 @@ app.registerExtension({
             // Store webcam stream at extension level to avoid reinitializing
             let webcamStream = null;
             let webcamVideo = null;
-            let mediaRecorder = null;
-            let recordedChunks = [];
             
             // Initialize webcam once for all nodes
             const initWebcam = async () => {
@@ -19,7 +17,7 @@ app.registerExtension({
                     try {
                         webcamStream = await navigator.mediaDevices.getUserMedia({
                             video: true,
-                            audio: true  // Now requesting audio too for video recording
+                            audio: false  // No need for audio anymore
                         });
                         // console.log("Got media stream:", webcamStream);
                         
@@ -43,55 +41,64 @@ app.registerExtension({
                 return { stream: webcamStream, video: webcamVideo };
             };
 
-            // Function to record video for a specified duration
-            const recordVideo = async (duration) => {
+            // Function to capture frames for a given duration
+            const captureFrames = async (duration, fps = 30) => {
                 return new Promise(async (resolve, reject) => {
                     try {
                         // Initialize webcam if not already done
-                        const { stream, video } = await initWebcam();
+                        const { video } = await initWebcam();
                         
-                        // Clear previous recording data
-                        recordedChunks = [];
+                        // Create canvas for frame capture
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const ctx = canvas.getContext('2d');
                         
-                        // Initialize MediaRecorder
-                        mediaRecorder = new MediaRecorder(stream, {
-                            mimeType: 'video/webm;codecs=vp9,opus'
-                        });
+                        // Calculate total frames to capture
+                        const totalFrames = Math.ceil(duration * fps);
+                        const frameInterval = 1000 / fps; // ms between frames
                         
-                        // Handle data available event
-                        mediaRecorder.ondataavailable = (event) => {
-                            if (event.data.size > 0) {
-                                recordedChunks.push(event.data);
-                            }
-                        };
+                        console.log(`Capturing ${totalFrames} frames at ${fps} FPS (${frameInterval}ms intervals)`);
                         
-                        // Handle recording stop event
-                        mediaRecorder.onstop = () => {
-                            // Create a blob from recorded chunks
-                            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                        // Store captured frames
+                        const frames = [];
+                        
+                        // Start capturing frames at regular intervals
+                        let frameCount = 0;
+                        const startTime = Date.now();
+                        
+                        const captureFrame = () => {
+                            // Draw current video frame to canvas
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            const frameDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                            frames.push(frameDataUrl);
                             
-                            // Convert blob to base64 data URL
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                                const base64data = reader.result;
-                                resolve(base64data);
-                            };
-                            reader.readAsDataURL(blob);
+                            frameCount++;
+                            if (frameCount < totalFrames) {
+                                // Calculate next frame time based on start time to avoid drift
+                                const nextFrameTime = startTime + Math.round(frameCount * frameInterval);
+                                const delay = Math.max(0, nextFrameTime - Date.now());
+                                
+                                // Schedule next frame capture
+                                setTimeout(captureFrame, delay);
+                            } else {
+                                // All frames captured
+                                console.log(`Completed capture of ${frames.length} frames`);
+                                
+                                resolve({
+                                    frames: frames,
+                                    width: canvas.width,
+                                    height: canvas.height,
+                                    duration: duration,
+                                    fps: fps
+                                });
+                            }
                         };
                         
-                        // Start recording
-                        mediaRecorder.start();
-                        console.log(`Recording started for ${duration} seconds`);
-                        
-                        // Stop recording after specified duration
-                        setTimeout(() => {
-                            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                                mediaRecorder.stop();
-                                console.log('Recording stopped');
-                            }
-                        }, duration * 1000);
+                        // Start capture process
+                        captureFrame();
                     } catch (error) {
-                        console.error("Error during video recording:", error);
+                        console.error("Error during capture:", error);
                         reject(error);
                     }
                 });
@@ -151,17 +158,16 @@ app.registerExtension({
                         ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
                         
                         const dataUrl = canvas.toDataURL("image/png");
-                        console.log("Captured frame at native resolution:", canvas.width, "x", canvas.height);
                         return dataUrl;
                     } 
-                    // Video recording mode
+                    // Video capture mode - capture frames
                     else {
-                        console.log(`Starting video recording for ${recordSeconds} seconds`);
                         
-                        // Record video and return data URL
-                        const videoDataUrl = await recordVideo(recordSeconds);
-                        console.log("Video recording completed, sending data to backend");
-                        return videoDataUrl;
+                        // Capture frames
+                        const captureResult = await captureFrames(recordSeconds);
+                        
+                        // Convert to JSON and return
+                        return JSON.stringify(captureResult);
                     }
                 };
 

@@ -49,6 +49,7 @@ class DTypeConverter:
         return (converted,)
 
 
+
 class FastWebcamCapture:
     @classmethod
     def INPUT_TYPES(s):
@@ -68,8 +69,7 @@ class FastWebcamCapture:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "AUDIO")
-    RETURN_NAMES = ("image", "audio")
+    RETURN_TYPES = ("IMAGE",)
     FUNCTION = "process_capture"
 
     CATEGORY = "image"
@@ -82,21 +82,13 @@ class FastWebcamCapture:
         If record_seconds > 0, it will record a video for the specified duration.
         For resizing or cropping, use standard ComfyUI nodes after this one.
         """
-        import torchaudio
         import torch
         import numpy as np
-        import time
-        import os
-        import tempfile
-        import subprocess
-        from pathlib import Path
+        import json
         
-        # Create empty audio dict as default
-        empty_audio = {"waveform": torch.zeros((1, 16000)), "sample_rate": 16000}
-        
-        # Check if we're receiving image or video data
+        # Check if we're receiving image or JSON frames data
         if isinstance(image, str):
-            # Image data URL
+            # Single image data URL
             if image.startswith("data:image/"):
                 # Extract the base64 data after the comma
                 base64_data = re.sub("^data:image/.+;base64,", "", image)
@@ -118,78 +110,70 @@ class FastWebcamCapture:
                 # ComfyUI expects BHWC format
                 image_tensor = torch.from_numpy(image_np)[None, ...]
                 
-                return (image_tensor, empty_audio)
+                return (image_tensor,)
                 
-            # Video data URL
-            elif image.startswith("data:video/"):
-                print("Received video data from webcam")
+            # JSON frames data from sequence capture
+            elif image.startswith("{") and "frames" in image:
+                print("Received frame sequence data from webcam")
                 
                 try:
-                    # Extract the base64 data after the comma
-                    mime_pattern = "data:video/.+;base64,"
-                    base64_data = re.sub(f"^{mime_pattern}", "", image)
+                    # Parse JSON data
+                    frame_data = json.loads(image)
+                    frames = frame_data.get("frames", [])
+                    fps = frame_data.get("fps", 30)
+                    duration = frame_data.get("duration", 1.0)
                     
-                    # Create a temporary file to store the video
-                    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as video_file:
-                        video_path = video_file.name
-                        video_file.write(base64.b64decode(base64_data))
+                    if not frames:
+                        raise ValueError("No frames received in frame data")
+                        
+                    print(f"Processing {len(frames)} frames captured at {fps} FPS over {duration} seconds")
                     
-                    # Process video with ffmpeg to extract frames
-                    frames_dir = tempfile.mkdtemp()
-                    frames_path = os.path.join(frames_dir, "frame_%04d.png")
+                    # Convert frames to tensor
+                    tensor_frames = []
                     
-                    # Extract frames with ffmpeg
-                    subprocess.run([
-                        "ffmpeg", "-i", video_path, 
-                        "-vf", "fps=30", 
-                        frames_path
-                    ], check=True, capture_output=True)
-                    
-                    # Load extracted frames
-                    frames = []
-                    frame_files = sorted([f for f in os.listdir(frames_dir) if f.startswith("frame_")])
-                    
-                    if not frame_files:
-                        raise ValueError("No frames extracted from video")
-                    
-                    # Load all frames
-                    for frame_file in frame_files:
-                        frame_path = os.path.join(frames_dir, frame_file)
-                        pil_frame = Image.open(frame_path).convert("RGB")
+                    for i, frame_dataurl in enumerate(frames):
+                        # Extract base64 data
+                        base64_data = re.sub("^data:image/.+;base64,", "", frame_dataurl)
+                        
+                        # Convert to PIL image
+                        buffer = BytesIO(base64.b64decode(base64_data))
+                        pil_frame = Image.open(buffer).convert("RGB")
+                        
+                        # Convert to numpy and normalize
                         frame_np = np.array(pil_frame).astype(np.float32) / 255.0
-                        frames.append(torch.from_numpy(frame_np))
+                        
+                        # Add to frame list
+                        tensor_frames.append(torch.from_numpy(frame_np))
                     
-                    # Extract audio with torchaudio
-                    try:
-                        waveform, sample_rate = torchaudio.load(video_path)
-                        audio = {"waveform": waveform, "sample_rate": sample_rate}
-                    except Exception as e:
-                        print(f"Error extracting audio: {e}")
-                        audio = empty_audio
+                    # Stack frames to create video tensor
+                    # ComfyUI expects image tensors in BHWC format (batch, height, width, channels)
+                    video_tensor = torch.stack(tensor_frames)  # First get [frames, H, W, C]
                     
-                    # Stack frames to create video tensor [B, H, W, C]
-                    video_tensor = torch.stack(frames)[None, ...]
+                    print(f"Stacked tensor shape before corrections: {video_tensor.shape}")
                     
-                    # Clean up temporary files
-                    try:
-                        os.unlink(video_path)
-                        for frame_file in frame_files:
-                            os.unlink(os.path.join(frames_dir, frame_file))
-                        os.rmdir(frames_dir)
-                    except Exception as e:
-                        print(f"Error cleaning up temp files: {e}")
+                    # Then interpret the frames as the batch dimension for ComfyUI
+                    if len(video_tensor.shape) == 4:
+                        # This is already correct format [frames, H, W, C]
+                        pass
+                    elif len(video_tensor.shape) == 5:
+                        # Remove extra batch dimension if present
+                        video_tensor = video_tensor.squeeze(0)
+                    else:
+                        # Something's wrong with the shape
+                        raise ValueError(f"Unexpected tensor shape: {video_tensor.shape}. Expected 4D [frames, H, W, C]")
                     
-                    print(f"Processed video with {len(frames)} frames")
-                    return (video_tensor, audio)
+                    print(f"Final video tensor shape: {video_tensor.shape}")
+                    
+                    return (video_tensor,)
                     
                 except Exception as e:
-                    print(f"Error processing video: {e}")
-                    # Fall back to empty frame and audio if video processing fails
-                    fallback_tensor = torch.zeros((1, 480, 640, 3))
-                    return (fallback_tensor, empty_audio)
+                    import traceback
+                    print(f"Error processing frame sequence: {e}")
+                    print(traceback.format_exc())
+                    raise RuntimeError(f"Failed to process frame sequence: {str(e)}")
                 
             else:
-                raise ValueError(f"Unrecognized data URL format: {image[:30]}...")
+                raise ValueError(f"Unrecognized data format from webcam")
         else:
             raise ValueError("Invalid data received from webcam")
 
@@ -1415,3 +1399,4 @@ class RenormalizeInt:
                 result = max(output_max, min(output_min, result))
 
         return result
+
