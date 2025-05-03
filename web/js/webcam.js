@@ -9,6 +9,7 @@ app.registerExtension({
             // Store webcam stream at extension level to avoid reinitializing
             let webcamStream = null;
             let webcamVideo = null;
+            let lastCapture = null;
             
             // Initialize webcam once for all nodes
             const initWebcam = async () => {
@@ -17,7 +18,7 @@ app.registerExtension({
                     try {
                         webcamStream = await navigator.mediaDevices.getUserMedia({
                             video: true,
-                            audio: false
+                            audio: false  // No need for audio anymore
                         });
                         // console.log("Got media stream:", webcamStream);
                         
@@ -39,6 +40,74 @@ app.registerExtension({
                     }
                 }
                 return { stream: webcamStream, video: webcamVideo };
+            };
+
+            // Function to capture frames for a given duration
+            const captureFrames = async (duration, fps = 30) => {
+                return new Promise(async (resolve, reject) => {
+                    try {
+                        // Initialize webcam if not already done
+                        const { video } = await initWebcam();
+                        
+                        // Create canvas for frame capture
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Calculate total frames to capture
+                        const totalFrames = Math.ceil(duration * fps);
+                        const frameInterval = 1000 / fps; // ms between frames
+                        
+                        console.log(`Capturing ${totalFrames} frames at ${fps} FPS (${frameInterval}ms intervals)`);
+                        
+                        // Store captured frames
+                        const frames = [];
+                        
+                        // Start capturing frames at regular intervals
+                        let frameCount = 0;
+                        const startTime = Date.now();
+                        
+                        const captureFrame = () => {
+                            // Draw current video frame to canvas
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            const frameDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                            frames.push(frameDataUrl);
+                            
+                            frameCount++;
+                            if (frameCount < totalFrames) {
+                                // Calculate next frame time based on start time to avoid drift
+                                const nextFrameTime = startTime + Math.round(frameCount * frameInterval);
+                                const delay = Math.max(0, nextFrameTime - Date.now());
+                                
+                                // Schedule next frame capture
+                                setTimeout(captureFrame, delay);
+                            } else {
+                                // All frames captured
+                                console.log(`Completed capture of ${frames.length} frames`);
+                                
+                                const result = {
+                                    frames: frames,
+                                    width: canvas.width,
+                                    height: canvas.height,
+                                    duration: duration,
+                                    fps: fps
+                                };
+                                
+                                // Store for potential reuse
+                                lastCapture = result;
+                                
+                                resolve(result);
+                            }
+                        };
+                        
+                        // Start capture process
+                        captureFrame();
+                    } catch (error) {
+                        console.error("Error during capture:", error);
+                        reject(error);
+                    }
+                });
             };
             
             nodeType.prototype.getCustomWidgets = function() {
@@ -66,13 +135,15 @@ app.registerExtension({
                 const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
                 
                 const camera = this.widgets.find((w) => w.name === "image");
-                const w = this.widgets.find((w) => w.name === "width");
-                const h = this.widgets.find((w) => w.name === "height");
-                
                 const canvas = document.createElement("canvas");
                 
                 camera.serializeValue = async () => {
-                    // console.log("Serializing camera value");
+                    // Check if we should reuse previous capture
+                    const captureOnQueueWidget = this.widgets.find(w => w.name === "capture_on_queue");
+                    if (!captureOnQueueWidget.value && lastCapture) {
+                        console.log("Reusing previous capture");
+                        return JSON.stringify(lastCapture);
+                    }
                     
                     // Only initialize webcam when actually needed
                     if (!webcamVideo || webcamVideo.paused || webcamVideo.readyState !== 4) {
@@ -81,22 +152,45 @@ app.registerExtension({
                         webcamVideo = video;
                     }
                     
-                    console.log("Capturing frame from video:", {
-                        paused: webcamVideo.paused,
-                        readyState: webcamVideo.readyState,
-                        videoWidth: webcamVideo.videoWidth,
-                        videoHeight: webcamVideo.videoHeight
-                    });
+                    // Find record_seconds input value
+                    const recordSecondsWidget = this.widgets.find(w => w.name === "record_seconds");
+                    const recordSeconds = recordSecondsWidget ? recordSecondsWidget.value : 0;
                     
-                    canvas.width = w.value || webcamVideo.videoWidth || 640;
-                    canvas.height = h.value || webcamVideo.videoHeight || 480;
-                    
-                    const ctx = canvas.getContext("2d");
-                    ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
-                    
-                    const dataUrl = canvas.toDataURL("image/png");
-                    // console.log("Successfully captured and converted frame to data URL");
-                    return dataUrl;
+                    // Single image capture mode
+                    if (recordSeconds <= 0) {
+                        console.log("Capturing single frame from video:", {
+                            videoWidth: webcamVideo.videoWidth,
+                            videoHeight: webcamVideo.videoHeight
+                        });
+                        
+                        // Always use native webcam resolution
+                        canvas.width = webcamVideo.videoWidth;
+                        canvas.height = webcamVideo.videoHeight;
+                        
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
+                        
+                        const dataUrl = canvas.toDataURL("image/png");
+                        
+                        // Store for potential reuse
+                        lastCapture = {
+                            frames: [dataUrl],
+                            width: canvas.width,
+                            height: canvas.height,
+                            duration: 0,
+                            fps: 30
+                        };
+                        
+                        return dataUrl;
+                    } 
+                    // Video capture mode - capture frames
+                    else {
+                        // Capture frames
+                        const captureResult = await captureFrames(recordSeconds);
+                        
+                        // Convert to JSON and return
+                        return JSON.stringify(captureResult);
+                    }
                 };
 
                 return r;

@@ -49,52 +49,158 @@ class DTypeConverter:
         return (converted,)
 
 
+
 class FastWebcamCapture:
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
                 "image": ("WEBCAM", {}),
-                "width": ("INT", {"default": 640, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
-                "height": ("INT", {"default": 480, "min": 0, "max": MAX_RESOLUTION, "step": 1}),
-                "capture_on_queue": ("BOOLEAN", {"default": True}),
+                "record_seconds": (
+                    "FLOAT", 
+                    {
+                        "default": 0.0, 
+                        "min": 0.0, 
+                        "max": 60.0, 
+                        "step": 0.5, 
+                        "tooltip": "Length of video to record in seconds. 0 means capture a single image (no video)."
+                    }
+                ),
+                "capture_on_queue": (
+                    "BOOLEAN",
+                    {
+                        "default": True,
+                        "tooltip": "When enabled, capture new frames on each queue. When disabled, reuse previously captured video."
+                    }
+                ),
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE", "INT")
+    RETURN_NAMES = ("image", "frame_count")
     FUNCTION = "process_capture"
 
     CATEGORY = "image"
 
-    def process_capture(self, image, width, height, capture_on_queue):
-        # Check if we got a data URL
-        if isinstance(image, str) and image.startswith("data:image/"):
-            # Extract the base64 data after the comma
-            base64_data = re.sub("^data:image/.+;base64,", "", image)
+    def __init__(self):
+        self.last_capture = None
+        self.last_frame_count = 0
 
-            # Convert base64 to PIL Image
-            buffer = BytesIO(base64.b64decode(base64_data))
-            pil_image = Image.open(buffer).convert("RGB")
+    def process_capture(self, image, record_seconds, capture_on_queue):
+        """
+        Process a webcam image or video at native resolution.
+        
+        This node captures the webcam feed at its native resolution.
+        If record_seconds > 0, it will record a video for the specified duration.
+        For resizing or cropping, use standard ComfyUI nodes after this one.
+        """
+        # If capture_on_queue is disabled and we have a previous capture, reuse it
+        if not capture_on_queue and self.last_capture is not None:
+            print("Reusing previous capture")
+            return (self.last_capture, self.last_frame_count)
 
-            # Convert PIL to numpy array
-            image = np.array(pil_image)
+        import torch
+        import numpy as np
+        import json
+        
+        # Check if we're receiving image or JSON frames data
+        if isinstance(image, str):
+            # Single image data URL
+            if image.startswith("data:image/"):
+                # Extract the base64 data after the comma
+                base64_data = re.sub("^data:image/.+;base64,", "", image)
 
-            # Handle resize if requested
-            if width > 0 and height > 0:
-                import cv2
+                # Convert base64 to PIL Image
+                buffer = BytesIO(base64.b64decode(base64_data))
+                pil_image = Image.open(buffer).convert("RGB")
+                
+                # Log the image size we're receiving from the webcam
+                print(f"Webcam image size: {pil_image.width}x{pil_image.height}")
 
-                image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+                # Convert PIL to numpy array
+                image_np = np.array(pil_image)
 
-            # Convert to float32 and normalize to 0-1 range
-            image = image.astype(np.float32) / 255.0
+                # Convert to float32 and normalize to 0-1 range
+                image_np = image_np.astype(np.float32) / 255.0
 
-            # Add batch dimension and convert to torch tensor
-            # ComfyUI expects BHWC format
-            image = torch.from_numpy(image)[None, ...]
-
-            return (image,)
+                # Add batch dimension and convert to torch tensor
+                # ComfyUI expects BHWC format
+                image_tensor = torch.from_numpy(image_np)[None, ...]
+                
+                # Store for potential reuse
+                self.last_capture = image_tensor
+                self.last_frame_count = 1
+                
+                return (image_tensor, 1)
+                
+            # JSON frames data from sequence capture
+            elif image.startswith("{") and "frames" in image:
+                print("Received frame sequence data from webcam")
+                
+                try:
+                    # Parse JSON data
+                    frame_data = json.loads(image)
+                    frames = frame_data.get("frames", [])
+                    fps = frame_data.get("fps", 30)
+                    duration = frame_data.get("duration", 1.0)
+                    
+                    if not frames:
+                        raise ValueError("No frames received in frame data")
+                        
+                    print(f"Processing {len(frames)} frames captured at {fps} FPS over {duration} seconds")
+                    
+                    # Convert frames to tensor
+                    tensor_frames = []
+                    
+                    for i, frame_dataurl in enumerate(frames):
+                        # Extract base64 data
+                        base64_data = re.sub("^data:image/.+;base64,", "", frame_dataurl)
+                        
+                        # Convert to PIL image
+                        buffer = BytesIO(base64.b64decode(base64_data))
+                        pil_frame = Image.open(buffer).convert("RGB")
+                        
+                        # Convert to numpy and normalize
+                        frame_np = np.array(pil_frame).astype(np.float32) / 255.0
+                        
+                        # Add to frame list
+                        tensor_frames.append(torch.from_numpy(frame_np))
+                    
+                    # Stack frames to create video tensor
+                    # ComfyUI expects image tensors in BHWC format (batch, height, width, channels)
+                    video_tensor = torch.stack(tensor_frames)  # First get [frames, H, W, C]
+                    
+                    print(f"Stacked tensor shape before corrections: {video_tensor.shape}")
+                    
+                    # Then interpret the frames as the batch dimension for ComfyUI
+                    if len(video_tensor.shape) == 4:
+                        # This is already correct format [frames, H, W, C]
+                        pass
+                    elif len(video_tensor.shape) == 5:
+                        # Remove extra batch dimension if present
+                        video_tensor = video_tensor.squeeze(0)
+                    else:
+                        # Something's wrong with the shape
+                        raise ValueError(f"Unexpected tensor shape: {video_tensor.shape}. Expected 4D [frames, H, W, C]")
+                    
+                    print(f"Final video tensor shape: {video_tensor.shape}")
+                    
+                    # Store for potential reuse
+                    self.last_capture = video_tensor
+                    self.last_frame_count = len(frames)
+                    
+                    return (video_tensor, len(frames))
+                    
+                except Exception as e:
+                    import traceback
+                    print(f"Error processing frame sequence: {e}")
+                    print(traceback.format_exc())
+                    raise RuntimeError(f"Failed to process frame sequence: {str(e)}")
+                
+            else:
+                raise ValueError(f"Unrecognized data format from webcam")
         else:
-            raise ValueError("Invalid image format received from webcam")
+            raise ValueError("Invalid data received from webcam")
 
 
 coco_classes = [
@@ -1318,3 +1424,4 @@ class RenormalizeInt:
                 result = max(output_max, min(output_min, result))
 
         return result
+
