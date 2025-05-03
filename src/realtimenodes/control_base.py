@@ -67,6 +67,9 @@ class ControlNodeBase(ABC):
                     {"default": True, "tooltip": "When enabled, the node updates every execution"},
                 ),
             },
+            "hidden": {
+                "unique_id": ("UNIQUE_ID",)
+            },
         }
 
     @classmethod
@@ -75,21 +78,22 @@ class ControlNodeBase(ABC):
             return float(time.time())
         return False
 
-    def __init__(self):
-        self.node_id = str(id(self))
+    def get_state(self, default=None, unique_id=None):
+        """Get state for this node using unique_id"""
+        return self.state_manager.get_state(unique_id, default)
 
-    def get_state(self, default=None):
-        return self.state_manager.get_state(self.node_id, default)
+    def set_state(self, state, unique_id=None):
+        """Set state for this node using unique_id"""
+        self.state_manager.set_state(unique_id, state)
 
-    def set_state(self, state):
-        self.state_manager.set_state(self.node_id, state)
-
-    def cleanup(self):
+    def cleanup(self, unique_id=None):
         """Clean up node state when node is destroyed"""
-        self.state_manager.clear_state(self.node_id)
+        self.state_manager.clear_state(unique_id)
 
     def __del__(self):
-        self.cleanup()
+        # Cannot use unique_id in del, since we don't know it at this point
+        # This might orphan some states, but they'll be cleaned up by cleanup_orphaned_states
+        pass
 
     @abstractmethod
     def update(self, *args, **kwargs):
