@@ -9,6 +9,8 @@ app.registerExtension({
             // Store webcam stream at extension level to avoid reinitializing
             let webcamStream = null;
             let webcamVideo = null;
+            let mediaRecorder = null;
+            let recordedChunks = [];
             
             // Initialize webcam once for all nodes
             const initWebcam = async () => {
@@ -17,7 +19,7 @@ app.registerExtension({
                     try {
                         webcamStream = await navigator.mediaDevices.getUserMedia({
                             video: true,
-                            audio: false
+                            audio: true  // Now requesting audio too for video recording
                         });
                         // console.log("Got media stream:", webcamStream);
                         
@@ -39,6 +41,60 @@ app.registerExtension({
                     }
                 }
                 return { stream: webcamStream, video: webcamVideo };
+            };
+
+            // Function to record video for a specified duration
+            const recordVideo = async (duration) => {
+                return new Promise(async (resolve, reject) => {
+                    try {
+                        // Initialize webcam if not already done
+                        const { stream, video } = await initWebcam();
+                        
+                        // Clear previous recording data
+                        recordedChunks = [];
+                        
+                        // Initialize MediaRecorder
+                        mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: 'video/webm;codecs=vp9,opus'
+                        });
+                        
+                        // Handle data available event
+                        mediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) {
+                                recordedChunks.push(event.data);
+                            }
+                        };
+                        
+                        // Handle recording stop event
+                        mediaRecorder.onstop = () => {
+                            // Create a blob from recorded chunks
+                            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                            
+                            // Convert blob to base64 data URL
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                const base64data = reader.result;
+                                resolve(base64data);
+                            };
+                            reader.readAsDataURL(blob);
+                        };
+                        
+                        // Start recording
+                        mediaRecorder.start();
+                        console.log(`Recording started for ${duration} seconds`);
+                        
+                        // Stop recording after specified duration
+                        setTimeout(() => {
+                            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                                mediaRecorder.stop();
+                                console.log('Recording stopped');
+                            }
+                        }, duration * 1000);
+                    } catch (error) {
+                        console.error("Error during video recording:", error);
+                        reject(error);
+                    }
+                });
             };
             
             nodeType.prototype.getCustomWidgets = function() {
@@ -69,8 +125,6 @@ app.registerExtension({
                 const canvas = document.createElement("canvas");
                 
                 camera.serializeValue = async () => {
-                    // console.log("Serializing camera value");
-                    
                     // Only initialize webcam when actually needed
                     if (!webcamVideo || webcamVideo.paused || webcamVideo.readyState !== 4) {
                         // console.log("Initializing webcam for first use...");
@@ -78,21 +132,37 @@ app.registerExtension({
                         webcamVideo = video;
                     }
                     
-                    console.log("Capturing frame from video:", {
-                        videoWidth: webcamVideo.videoWidth,
-                        videoHeight: webcamVideo.videoHeight
-                    });
+                    // Find record_seconds input value
+                    const recordSecondsWidget = this.widgets.find(w => w.name === "record_seconds");
+                    const recordSeconds = recordSecondsWidget ? recordSecondsWidget.value : 0;
                     
-                    // Always use native webcam resolution
-                    canvas.width = webcamVideo.videoWidth;
-                    canvas.height = webcamVideo.videoHeight;
-                    
-                    const ctx = canvas.getContext("2d");
-                    ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
-                    
-                    const dataUrl = canvas.toDataURL("image/png");
-                    console.log("Captured frame at native resolution:", canvas.width, "x", canvas.height);
-                    return dataUrl;
+                    // Single image capture mode
+                    if (recordSeconds <= 0) {
+                        console.log("Capturing single frame from video:", {
+                            videoWidth: webcamVideo.videoWidth,
+                            videoHeight: webcamVideo.videoHeight
+                        });
+                        
+                        // Always use native webcam resolution
+                        canvas.width = webcamVideo.videoWidth;
+                        canvas.height = webcamVideo.videoHeight;
+                        
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
+                        
+                        const dataUrl = canvas.toDataURL("image/png");
+                        console.log("Captured frame at native resolution:", canvas.width, "x", canvas.height);
+                        return dataUrl;
+                    } 
+                    // Video recording mode
+                    else {
+                        console.log(`Starting video recording for ${recordSeconds} seconds`);
+                        
+                        // Record video and return data URL
+                        const videoDataUrl = await recordVideo(recordSeconds);
+                        console.log("Video recording completed, sending data to backend");
+                        return videoDataUrl;
+                    }
                 };
 
                 return r;

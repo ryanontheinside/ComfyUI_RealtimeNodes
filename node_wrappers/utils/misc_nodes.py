@@ -55,47 +55,143 @@ class FastWebcamCapture:
         return {
             "required": {
                 "image": ("WEBCAM", {}),
-                "capture_on_queue": ("BOOLEAN", {"default": True, "tooltip": "Whether to capture the frame when the node is queued"}),
+                "record_seconds": (
+                    "FLOAT", 
+                    {
+                        "default": 0.0, 
+                        "min": 0.0, 
+                        "max": 60.0, 
+                        "step": 0.5, 
+                        "tooltip": "Length of video to record in seconds. 0 means capture a single image (no video)."
+                    }
+                ),
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE", "AUDIO")
+    RETURN_NAMES = ("image", "audio")
     FUNCTION = "process_capture"
 
     CATEGORY = "image"
 
-    def process_capture(self, image, capture_on_queue):
+    def process_capture(self, image, record_seconds):
         """
-        Process a webcam image at native resolution.
+        Process a webcam image or video at native resolution.
         
-        This node simply captures the webcam feed at its native resolution.
+        This node captures the webcam feed at its native resolution.
+        If record_seconds > 0, it will record a video for the specified duration.
         For resizing or cropping, use standard ComfyUI nodes after this one.
         """
-        # Check if we got a data URL
-        if isinstance(image, str) and image.startswith("data:image/"):
-            # Extract the base64 data after the comma
-            base64_data = re.sub("^data:image/.+;base64,", "", image)
+        import torchaudio
+        import torch
+        import numpy as np
+        import time
+        import os
+        import tempfile
+        import subprocess
+        from pathlib import Path
+        
+        # Create empty audio dict as default
+        empty_audio = {"waveform": torch.zeros((1, 16000)), "sample_rate": 16000}
+        
+        # Check if we're receiving image or video data
+        if isinstance(image, str):
+            # Image data URL
+            if image.startswith("data:image/"):
+                # Extract the base64 data after the comma
+                base64_data = re.sub("^data:image/.+;base64,", "", image)
 
-            # Convert base64 to PIL Image
-            buffer = BytesIO(base64.b64decode(base64_data))
-            pil_image = Image.open(buffer).convert("RGB")
-            
-            # Log the image size we're receiving from the webcam
-            print(f"Webcam image size: {pil_image.width}x{pil_image.height}")
+                # Convert base64 to PIL Image
+                buffer = BytesIO(base64.b64decode(base64_data))
+                pil_image = Image.open(buffer).convert("RGB")
+                
+                # Log the image size we're receiving from the webcam
+                print(f"Webcam image size: {pil_image.width}x{pil_image.height}")
 
-            # Convert PIL to numpy array
-            image = np.array(pil_image)
+                # Convert PIL to numpy array
+                image_np = np.array(pil_image)
 
-            # Convert to float32 and normalize to 0-1 range
-            image = image.astype(np.float32) / 255.0
+                # Convert to float32 and normalize to 0-1 range
+                image_np = image_np.astype(np.float32) / 255.0
 
-            # Add batch dimension and convert to torch tensor
-            # ComfyUI expects BHWC format
-            image = torch.from_numpy(image)[None, ...]
-
-            return (image,)
+                # Add batch dimension and convert to torch tensor
+                # ComfyUI expects BHWC format
+                image_tensor = torch.from_numpy(image_np)[None, ...]
+                
+                return (image_tensor, empty_audio)
+                
+            # Video data URL
+            elif image.startswith("data:video/"):
+                print("Received video data from webcam")
+                
+                try:
+                    # Extract the base64 data after the comma
+                    mime_pattern = "data:video/.+;base64,"
+                    base64_data = re.sub(f"^{mime_pattern}", "", image)
+                    
+                    # Create a temporary file to store the video
+                    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as video_file:
+                        video_path = video_file.name
+                        video_file.write(base64.b64decode(base64_data))
+                    
+                    # Process video with ffmpeg to extract frames
+                    frames_dir = tempfile.mkdtemp()
+                    frames_path = os.path.join(frames_dir, "frame_%04d.png")
+                    
+                    # Extract frames with ffmpeg
+                    subprocess.run([
+                        "ffmpeg", "-i", video_path, 
+                        "-vf", "fps=30", 
+                        frames_path
+                    ], check=True, capture_output=True)
+                    
+                    # Load extracted frames
+                    frames = []
+                    frame_files = sorted([f for f in os.listdir(frames_dir) if f.startswith("frame_")])
+                    
+                    if not frame_files:
+                        raise ValueError("No frames extracted from video")
+                    
+                    # Load all frames
+                    for frame_file in frame_files:
+                        frame_path = os.path.join(frames_dir, frame_file)
+                        pil_frame = Image.open(frame_path).convert("RGB")
+                        frame_np = np.array(pil_frame).astype(np.float32) / 255.0
+                        frames.append(torch.from_numpy(frame_np))
+                    
+                    # Extract audio with torchaudio
+                    try:
+                        waveform, sample_rate = torchaudio.load(video_path)
+                        audio = {"waveform": waveform, "sample_rate": sample_rate}
+                    except Exception as e:
+                        print(f"Error extracting audio: {e}")
+                        audio = empty_audio
+                    
+                    # Stack frames to create video tensor [B, H, W, C]
+                    video_tensor = torch.stack(frames)[None, ...]
+                    
+                    # Clean up temporary files
+                    try:
+                        os.unlink(video_path)
+                        for frame_file in frame_files:
+                            os.unlink(os.path.join(frames_dir, frame_file))
+                        os.rmdir(frames_dir)
+                    except Exception as e:
+                        print(f"Error cleaning up temp files: {e}")
+                    
+                    print(f"Processed video with {len(frames)} frames")
+                    return (video_tensor, audio)
+                    
+                except Exception as e:
+                    print(f"Error processing video: {e}")
+                    # Fall back to empty frame and audio if video processing fails
+                    fallback_tensor = torch.zeros((1, 480, 640, 3))
+                    return (fallback_tensor, empty_audio)
+                
+            else:
+                raise ValueError(f"Unrecognized data URL format: {image[:30]}...")
         else:
-            raise ValueError("Invalid image format received from webcam")
+            raise ValueError("Invalid data received from webcam")
 
 
 coco_classes = [
