@@ -47,6 +47,16 @@ def load_nodes_from_directory(package_path):
                                 display_name = " ".join(
                                     word.capitalize() for word in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\W|$)|\d+", name)
                                 )
+                                
+                                # Add prefix if defined
+                                if hasattr(obj, "NAME_PREFIX"):
+                                    display_name = f"{obj.NAME_PREFIX} {display_name}"
+                                
+                                # Add suffix if defined
+                                if hasattr(obj, "NAME_SUFFIX"):
+                                    display_name = f"{display_name} {obj.NAME_SUFFIX}"
+                                
+                                # Add the realtime suffix
                                 suffix = " 🕒🅡🅣🅝"
                                 if not display_name.endswith(suffix):
                                     display_name += suffix
@@ -111,6 +121,15 @@ for node_name in NODE_CLASS_MAPPINGS.keys():
     # Convert camelCase or snake_case to Title Case
     if node_name not in NODE_DISPLAY_NAME_MAPPINGS:
         display_name = " ".join(word.capitalize() for word in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\W|$)|\d+", node_name))
+        
+        # Add prefix if defined
+        node_class = NODE_CLASS_MAPPINGS[node_name]
+        if hasattr(node_class, "NAME_PREFIX"):
+            display_name = f"{node_class.NAME_PREFIX} {display_name}"
+        
+        # Add suffix if defined
+        if hasattr(node_class, "NAME_SUFFIX"):
+            display_name = f"{display_name} {node_class.NAME_SUFFIX}"
     else:
         display_name = NODE_DISPLAY_NAME_MAPPINGS[node_name]
 

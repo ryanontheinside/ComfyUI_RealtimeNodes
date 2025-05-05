@@ -22,7 +22,7 @@ class StateResetNode(ControlNodeBase):
     RETURN_TYPES = ("BOOLEAN",)
     FUNCTION = "update"
     CATEGORY = "Realtime Nodes/control/utility"
-
+    NAME_SUFFIX = "(BETA)"
     def update(self, trigger, always_execute=True):
         if trigger:
             self.state_manager.clear_all_states()
@@ -49,7 +49,8 @@ class StateTestNode(ControlNodeBase):
     RETURN_TYPES = ("INT",)
     FUNCTION = "update"
     CATEGORY = "Realtime Nodes/control/utility"
-
+    NAME_SUFFIX = "(BETA)"
+    
     def update(self, increment, always_execute=True):
         state = self.get_state({"counter": 0})
 
@@ -70,6 +71,7 @@ class GetStateNode(ControlNodeBase):
     RETURN_NAMES = ("value",)
     FUNCTION = "update"
     DESCRIPTION = "Retrieve a value from the global state using the given key. If the key is not found, return the default value."
+    NAME_SUFFIX = "(BETA)"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -127,7 +129,7 @@ class SetStateNode(ControlNodeBase):
     DESCRIPTION = (
         "Store a value in the global state with the given key. The value will be accessible in future workflow runs through GetStateNode."
     )
-
+    NAME_SUFFIX = "(BETA)"
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
