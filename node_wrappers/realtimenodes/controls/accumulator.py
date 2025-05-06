@@ -17,6 +17,8 @@ class BaseAccumulatorNode(ControlNodeBase):
     
     # These should be overridden by subclasses
     NODE_TYPE_NAME = "Base"
+    RETURN_TYPES = (AlwaysEqualProxy("*"), "BOOLEAN")
+    RETURN_NAMES = ("accumulated_values", "batch_complete")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -55,8 +57,8 @@ class AnyAccumulatorNode(BaseAccumulatorNode):
     Node that accumulates inputs of any type over multiple workflow runs.
     """
     
-    RETURN_TYPES = (AlwaysEqualProxy("*"),)
-    RETURN_NAMES = ("accumulated_values",)
+    RETURN_TYPES = (AlwaysEqualProxy("*"), "BOOLEAN")
+    RETURN_NAMES = ("accumulated_values", "batch_complete")
     NODE_TYPE_NAME = "Any"
     
     @classmethod
@@ -115,7 +117,7 @@ class AnyAccumulatorNode(BaseAccumulatorNode):
         state[state_key] = accumulated
         self.set_state(state, unique_id)
         
-        return (output_values,)
+        return (output_values, batch_complete)
 
 
 class ImageAccumulatorNode(BaseAccumulatorNode):
@@ -123,8 +125,8 @@ class ImageAccumulatorNode(BaseAccumulatorNode):
     Node that accumulates image inputs (BHWC format) over multiple workflow runs.
     """
     
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image_batch",)
+    RETURN_TYPES = ("IMAGE", "BOOLEAN")
+    RETURN_NAMES = ("image_batch", "batch_complete")
     NODE_TYPE_NAME = "Image"
     
     @classmethod
@@ -219,7 +221,7 @@ class ImageAccumulatorNode(BaseAccumulatorNode):
         state[f"{state_key}_frames"] = frames
         self.set_state(state, unique_id)
         
-        return (output_tensor,)
+        return (output_tensor, batch_complete)
 
 
 class MaskAccumulatorNode(BaseAccumulatorNode):
@@ -227,8 +229,8 @@ class MaskAccumulatorNode(BaseAccumulatorNode):
     Node that accumulates mask inputs over multiple workflow runs.
     """
     
-    RETURN_TYPES = ("MASK",)
-    RETURN_NAMES = ("mask_batch",)
+    RETURN_TYPES = ("MASK", "BOOLEAN")
+    RETURN_NAMES = ("mask_batch", "batch_complete")
     NODE_TYPE_NAME = "Mask"
     
     @classmethod
@@ -322,7 +324,7 @@ class MaskAccumulatorNode(BaseAccumulatorNode):
         state[f"{state_key}_frames"] = frames
         self.set_state(state, unique_id)
         
-        return (output_tensor,)
+        return (output_tensor, batch_complete)
 
 
 class LatentAccumulatorNode(BaseAccumulatorNode):
@@ -330,8 +332,8 @@ class LatentAccumulatorNode(BaseAccumulatorNode):
     Node that accumulates latent inputs over multiple workflow runs.
     """
     
-    RETURN_TYPES = ("LATENT",)
-    RETURN_NAMES = ("latent_batch",)
+    RETURN_TYPES = ("LATENT", "BOOLEAN")
+    RETURN_NAMES = ("latent_batch", "batch_complete")
     NODE_TYPE_NAME = "Latent"
     
     @classmethod
@@ -431,6 +433,4 @@ class LatentAccumulatorNode(BaseAccumulatorNode):
         self.set_state(state, unique_id)
         
         # Return latent dict with samples
-        return ({"samples": output_samples, **metadata},)
-
-
+        return ({"samples": output_samples, **metadata}, batch_complete)
