@@ -7,6 +7,8 @@ import math
 from ....src.realtimenodes.control_base import ControlNodeBase
 from ....src.utils.general import AlwaysEqualProxy
 from ..utils.temporal_processing import TemporalNetV2Preprocessor
+from comfy_execution.graph import ExecutionBlocker
+
 
 class StateResetNode(ControlNodeBase):
     """Node that resets all control node states when triggered"""
@@ -162,5 +164,39 @@ class SetStateNode(ControlNodeBase):
             print(f"[State Node] Error storing value: {str(e)}")
 
         return (value,)
+
+
+class ExecutionBlockerNode(ControlNodeBase):
+    """
+    Node that returns an ExecutionBlocker when triggered.
+    """
+    
+    CATEGORY = "Realtime Nodes/control"
+    FUNCTION = "update"
+    DESCRIPTION = "Blocks execution when triggered"
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "trigger": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "When True, blocks execution"
+                }),
+                "message": ("STRING", {
+                    "default": "",
+                    "multiline": True,
+                    "tooltip": "Optional message to display when blocking"
+                })
+            }
+        }
+    
+    RETURN_TYPES = (AlwaysEqualProxy("*"),)
+    RETURN_NAMES = ("output",)
+    
+    def update(self, trigger, message, always_execute=True, unique_id=None):
+        if trigger:
+            return (ExecutionBlocker(message if message else None),)
+        return (None,)
 
 
