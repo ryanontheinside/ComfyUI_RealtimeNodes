@@ -139,9 +139,11 @@ class RTDrawLinesNode:
                     {"default": 3, "min": 1, "max": 20, "tooltip": "Radius of endpoint circles in pixels"},
                 ),
                 "draw_label": ("BOOLEAN", {"default": False, "tooltip": "Draw text label on line"}),
-                "label_text": ("STRING", {"default": "Line", "tooltip": "Text to display as label"}),
+                "label_prefix": ("STRING", {"default": "Line", "tooltip": "Prefix for label"}),
+                "label_values": ("STRING", {"default": "", "tooltip": "Values for label"}),
                 "label_position": (["Midpoint", "Start", "End"], {"default": "Midpoint"}),
                 "font_scale": ("FLOAT", {"default": 0.5, "min": 0.1, "max": 2.0, "step": 0.1}),
+                "batch_value_mode": (["Index-based", "First value only"], {"default": "Index-based", "tooltip": "How to apply values across batch"}),
             },
         }
 
@@ -159,35 +161,94 @@ class RTDrawLinesNode:
         draw_endpoints: bool = False,
         point_radius: int = 3,
         draw_label: bool = False,
-        label_text: str = "Line",
+        label_prefix: str = "Line",
+        label_values: str = "",
         label_position: str = "Midpoint",
         font_scale: float = 0.5,
+        batch_value_mode: str = "Index-based",
     ):
         """Draw lines efficiently using the DrawingEngine."""
         # Use the coordinate system to ensure proper handling
         space = CoordinateSystem.NORMALIZED if is_normalized else CoordinateSystem.PIXEL
         dimensions = CoordinateSystem.get_dimensions_from_tensor(image)
 
+        # Parse the values list
+        values_list = []
+        if label_values and label_values.strip():
+            values_list = [v.strip() for v in label_values.split(',')]
+        
+        # Get the batch size
+        batch_size = image.shape[0]
+        
+        # Process images individually to apply different labels
+        output_batch = image.clone()
         drawing_engine = DrawingEngine()
-        return (
-            drawing_engine.draw_lines(
-                image=image,
-                x1=x1,
-                y1=y1,
-                x2=x2,
-                y2=y2,
+        
+        # Standardize inputs to lists
+        x1_list = x1 if isinstance(x1, list) else [x1]
+        y1_list = y1 if isinstance(y1, list) else [y1]
+        x2_list = x2 if isinstance(x2, list) else [x2]
+        y2_list = y2 if isinstance(y2, list) else [y2]
+        
+        # Process each batch item
+        for b in range(batch_size):
+            # Create a single-item tensor for this batch
+            single_image = output_batch[b:b+1]
+            
+            # Handle different batch mapping strategies for coordinates
+            if batch_mapping == "one-to-one":
+                # One-to-one: each batch item gets one coordinate
+                if b < len(x1_list):
+                    batch_x1 = x1_list[b]
+                    batch_y1 = y1_list[b]
+                    batch_x2 = x2_list[b]
+                    batch_y2 = y2_list[b]
+                else:
+                    continue  # Skip if not enough coordinates
+            elif batch_mapping == "all-on-first" and b > 0:
+                continue  # Skip all but the first item
+            else:
+                # Broadcast: all coordinates on all batches
+                batch_x1 = x1_list
+                batch_y1 = y1_list
+                batch_x2 = x2_list
+                batch_y2 = y2_list
+            
+            # Determine the label for this batch
+            if values_list:
+                if batch_value_mode == "Index-based" and b < len(values_list):
+                    # Use batch index to select value
+                    current_value = values_list[b]
+                else:
+                    # Default to first value
+                    current_value = values_list[0]
+                current_label = f"{label_prefix}: {current_value}"
+            else:
+                current_label = label_prefix
+            
+            # Process this batch item
+            result = drawing_engine.draw_lines(
+                image=single_image,
+                x1=batch_x1,
+                y1=batch_y1,
+                x2=batch_x2,
+                y2=batch_y2,
                 thickness=thickness,
                 color=color_hex,
                 is_normalized=is_normalized,
-                batch_mapping=batch_mapping,
+                batch_mapping="broadcast",  # Always broadcast within the single item
                 draw_endpoints=draw_endpoints,
                 point_radius=point_radius,
                 draw_label=draw_label,
-                label_text=label_text,
+                label_text=current_label,
                 label_position=label_position,
                 font_scale=font_scale,
-            ),
-        )
+            )
+            
+            # Update the output batch
+            output_batch[b:b+1] = result
+        
+        return (output_batch,)
 
 
 class RTDrawPolygonNode:
@@ -238,8 +299,10 @@ class RTDrawPolygonNode:
                 "draw_vertices": ("BOOLEAN", {"default": False, "tooltip": "Draw points at polygon vertices"}),
                 "vertex_radius": ("INT", {"default": 3, "min": 1, "max": 20, "tooltip": "Radius of vertex points"}),
                 "draw_label": ("BOOLEAN", {"default": False, "tooltip": "Draw text label on polygon"}),
-                "label_text": ("STRING", {"default": "Polygon", "tooltip": "Text to display as label"}),
+                "label_prefix": ("STRING", {"default": "Polygon", "tooltip": "Prefix for label"}),
+                "label_values": ("STRING", {"default": "", "tooltip": "Values for label"}),
                 "font_scale": ("FLOAT", {"default": 0.5, "min": 0.1, "max": 2.0, "step": 0.1}),
+                "batch_value_mode": (["Index-based", "First value only"], {"default": "Index-based", "tooltip": "How to apply values across batch"}),
             },
         }
 
@@ -256,33 +319,71 @@ class RTDrawPolygonNode:
         draw_vertices: bool = False,
         vertex_radius: int = 3,
         draw_label: bool = False,
-        label_text: str = "Polygon",
+        label_prefix: str = "Polygon",
+        label_values: str = "",
         font_scale: float = 0.5,
+        batch_value_mode: str = "Index-based",
     ):
         """Draw polygon efficiently using the DrawingEngine."""
         # Use the coordinate system to ensure proper handling
         space = CoordinateSystem.NORMALIZED if is_normalized else CoordinateSystem.PIXEL
         dimensions = CoordinateSystem.get_dimensions_from_tensor(image)
 
+        # Parse the values list
+        values_list = []
+        if label_values and label_values.strip():
+            values_list = [v.strip() for v in label_values.split(',')]
+        
+        # Get the batch size
+        batch_size = image.shape[0]
+        
+        # Process images individually to apply different labels
+        output_batch = image.clone()
         drawing_engine = DrawingEngine()
-        return (
-            drawing_engine.draw_polygon(
-                image=image,
+        
+        # Process each batch item
+        for b in range(batch_size):
+            # Skip processing based on mapping strategy
+            if batch_mapping == "all-on-first" and b > 0:
+                continue
+                
+            # Create a single-item tensor for this batch
+            single_image = output_batch[b:b+1]
+            
+            # Determine the label for this batch
+            if values_list:
+                if batch_value_mode == "Index-based" and b < len(values_list):
+                    # Use batch index to select value
+                    current_value = values_list[b]
+                else:
+                    # Default to first value
+                    current_value = values_list[0]
+                current_label = f"{label_prefix}: {current_value}"
+            else:
+                current_label = label_prefix
+            
+            # Process this batch item
+            result = drawing_engine.draw_polygon(
+                image=single_image,
                 points_x=points_x,
                 points_y=points_y,
                 color=color_hex,
                 thickness=thickness,
                 fill=fill,
                 is_normalized=is_normalized,
-                batch_mapping=batch_mapping,
+                batch_mapping=batch_mapping if batch_mapping != "one-to-one" else "broadcast",
                 draw_vertices=draw_vertices,
                 vertex_radius=vertex_radius,
                 draw_label=draw_label,
-                label_text=label_text,
+                label_text=current_label,
                 label_position="Center",  # Only center supported for polygons currently
                 font_scale=font_scale,
-            ),
-        )
+            )
+            
+            # Update the output batch
+            output_batch[b:b+1] = result
+        
+        return (output_batch,)
 
 
 class RTCoordinateConverterNode:
