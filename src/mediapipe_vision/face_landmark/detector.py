@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import mediapipe as mp
 import numpy as np
@@ -8,12 +8,11 @@ from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
 
 from ...utils.timing import TimestampProvider  # Import TimestampProvider
-
-# Import new types
+from ..common import BaseDetector
 from ..types import LandmarkPoint
 
 
-class FaceLandmarkDetector:
+class FaceLandmarkDetector(BaseDetector[List[LandmarkPoint]]):
     """Detects face landmarks and blendshapes using MediaPipe FaceLandmarker."""
 
     def __init__(self, model_path: str):
@@ -22,11 +21,11 @@ class FaceLandmarkDetector:
         Args:
             model_path: Path to the MediaPipe FaceLandmarker .task file.
         """
-        if not model_path:
-            raise ValueError("A valid model_path must be provided.")
-
-        self.model_path = model_path
-        self._detector_instance = None
+        super().__init__(model_path)
+        self._output_blendshapes = False
+        self._output_transform_matrix = False
+        self._blendshapes = []
+        self._transform_matrices = []
         self._current_options = None  # Store current options for comparison
         self._timestamp_provider = None  # Added
 
@@ -61,6 +60,81 @@ class FaceLandmarkDetector:
         self._timestamp_provider = TimestampProvider() if mode_enum == vision.RunningMode.VIDEO else None
         return vision.FaceLandmarker.create_from_options(options)
 
+    def _create_detector_options(self, base_options: python.BaseOptions,
+                                mode_enum: vision.RunningMode, **kwargs) -> vision.FaceLandmarkerOptions:
+        """Create FaceLandmarker-specific options with parameters:
+            - num_faces: Maximum number of faces to detect
+            - min_detection_confidence: Minimum confidence for face detection
+            - min_presence_confidence: Minimum confidence for face presence
+            - min_tracking_confidence: Minimum confidence for face tracking
+            - output_blendshapes: Whether to output face blendshapes
+            - output_transform_matrix: Whether to output facial transformation matrices
+        """
+        self._output_blendshapes = kwargs.get('output_blendshapes', False)
+        self._output_transform_matrix = kwargs.get('output_transform_matrix', False)
+        
+        return vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            running_mode=mode_enum,
+            num_faces=kwargs.get('num_faces', 1),
+            min_face_detection_confidence=kwargs.get('min_detection_confidence', 0.5),
+            min_face_presence_confidence=kwargs.get('min_presence_confidence', 0.5),
+            min_tracking_confidence=kwargs.get('min_tracking_confidence', 0.5),
+            output_face_blendshapes=self._output_blendshapes,
+            output_facial_transformation_matrixes=self._output_transform_matrix,
+        )
+
+    def _create_detector_instance(self, options: vision.FaceLandmarkerOptions) -> vision.FaceLandmarker:
+        return vision.FaceLandmarker.create_from_options(options)
+
+    def _get_options_tuple(self, running_mode: str = None, delegate: str = None, **kwargs) -> tuple:
+        if self._current_options:
+            return (
+                self._current_options.num_faces,
+                self._current_options.min_face_detection_confidence,
+                self._current_options.min_face_presence_confidence,
+                self._current_options.min_tracking_confidence,
+                self._current_options.output_face_blendshapes,
+                self._current_options.output_facial_transformation_matrixes,
+                running_mode,
+                delegate,
+            )
+        else:
+            return (
+                kwargs.get('num_faces', 1),
+                kwargs.get('min_detection_confidence', 0.5),
+                kwargs.get('min_presence_confidence', 0.5),
+                kwargs.get('min_tracking_confidence', 0.5),
+                kwargs.get('output_blendshapes', False),
+                kwargs.get('output_transform_matrix', False),
+                running_mode,
+                delegate,
+            )
+
+    def _process_detection_result(self, detection_result: Any) -> List[List[LandmarkPoint]]:
+        """Process detection result and extract blendshapes and transforms if requested."""
+        self._blendshapes = []
+        self._transform_matrices = []
+        
+        current_image_landmarks = []
+        if detection_result and detection_result.face_landmarks:
+            for face_idx, face_landmarks_mp in enumerate(detection_result.face_landmarks):
+                landmarks = [LandmarkPoint(index=lm_idx, x=lm.x, y=lm.y, z=lm.z) for lm_idx, lm in enumerate(face_landmarks_mp)]
+                current_image_landmarks.append(landmarks)
+                
+                if self._output_blendshapes and detection_result.face_blendshapes and face_idx < len(detection_result.face_blendshapes):
+                    blendshapes = {bs.category_name: bs.score for bs in detection_result.face_blendshapes[face_idx]}
+                    self._blendshapes.append(blendshapes)
+                    
+                if (
+                    self._output_transform_matrix
+                    and detection_result.facial_transformation_matrixes
+                    and face_idx < len(detection_result.facial_transformation_matrixes)
+                ):
+                    self._transform_matrices.append(detection_result.facial_transformation_matrixes[face_idx])
+                    
+        return current_image_landmarks
+
     def detect(
         self,
         image: torch.Tensor,
@@ -72,7 +146,7 @@ class FaceLandmarkDetector:
         output_transform_matrix: bool = False,
         running_mode: str = "video",
         delegate: str = "cpu",
-    ) -> Tuple[List[List[LandmarkPoint]], Optional[List[Dict[str, float]]], Optional[List[np.ndarray]]]:  # Added running_mode
+    ) -> Tuple[List[List[List[LandmarkPoint]]], Optional[List[List[Dict[str, float]]]], Optional[List[List[np.ndarray]]]]:
         """Detects face landmarks in the input image tensor.
 
         Returns:
