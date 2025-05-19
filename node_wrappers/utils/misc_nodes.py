@@ -1422,6 +1422,41 @@ class RenormalizeInt:
                 result = max(output_min, min(output_max, result))
             else:
                 result = max(output_max, min(output_min, result))
-
         return result
+
+# borrowed from Acly's comfyui-tooling-nodes
+# https://github.com/Acly/comfyui-tooling-nodes/blob/main/nodes.py
+from PIL import Image
+import base64
+import numpy as np
+import torch
+from io import BytesIO
+
+class LoadImageB64:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"image": ("STRING", {"multiline": False})}}
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    CATEGORY = "image"
+    FUNCTION = "load_image"
+
+    def load_image(self, image):
+        imgdata = base64.b64decode(image)
+        img = Image.open(BytesIO(imgdata))
+
+        if "A" in img.getbands():
+            mask = np.array(img.getchannel("A")).astype(np.float32) / 255.0
+            mask = torch.from_numpy(mask)
+        else:
+            mask = None
+
+        img = img.convert("RGB")
+        img = np.array(img).astype(np.float32) / 255.0
+        img = torch.from_numpy(img)[None,]
+
+        return (img, mask)
+
+
 
