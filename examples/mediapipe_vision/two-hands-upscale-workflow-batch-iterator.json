@@ -1,8 +1,8 @@
 {
   "id": "00000000-0000-0000-0000-000000000000",
   "revision": 0,
-  "last_node_id": 92,
-  "last_link_id": 200,
+  "last_node_id": 93,
+  "last_link_id": 203,
   "nodes": [
     {
       "id": 35,
@@ -2091,229 +2091,6 @@
       "widgets_values": []
     },
     {
-      "id": 76,
-      "type": "VHS_LoadVideo",
-      "pos": [
-        -650,
-        2500
-      ],
-      "size": [
-        247.455078125,
-        452.2566223144531
-      ],
-      "flags": {},
-      "order": 9,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "meta_batch",
-          "shape": 7,
-          "type": "VHS_BatchManager",
-          "link": null
-        },
-        {
-          "name": "vae",
-          "shape": 7,
-          "type": "VAE",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            199
-          ]
-        },
-        {
-          "name": "frame_count",
-          "type": "INT",
-          "links": null
-        },
-        {
-          "name": "audio",
-          "type": "AUDIO",
-          "links": null
-        },
-        {
-          "name": "video_info",
-          "type": "VHS_VIDEOINFO",
-          "links": []
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfyui-videohelpersuite",
-        "ver": "1.6.1",
-        "Node name for S&R": "VHS_LoadVideo",
-        "widget_ue_connectable": {}
-      },
-      "widgets_values": {
-        "video": "pinching.mp4",
-        "force_rate": 0,
-        "custom_width": 0,
-        "custom_height": 0,
-        "frame_load_cap": 100,
-        "skip_first_frames": 0,
-        "select_every_nth": 1,
-        "format": "AnimateDiff",
-        "choose video to upload": "image",
-        "videopreview": {
-          "hidden": false,
-          "paused": false,
-          "params": {
-            "filename": "pinching.mp4",
-            "type": "input",
-            "format": "video/mp4",
-            "force_rate": 0,
-            "custom_width": 0,
-            "custom_height": 0,
-            "frame_load_cap": 100,
-            "skip_first_frames": 0,
-            "select_every_nth": 1
-          }
-        }
-      }
-    },
-    {
-      "id": 84,
-      "type": "BatchResultCollector",
-      "pos": [
-        8981.9296875,
-        2056.58984375
-      ],
-      "size": [
-        390.5999755859375,
-        174
-      ],
-      "flags": {},
-      "order": 49,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 196
-        },
-        {
-          "name": "batch_info",
-          "type": "BATCH_INFO",
-          "link": 188
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": null
-        }
-      ],
-      "properties": {
-        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
-        "ver": "91017f76d80e829738853f366c2f89b7f21f8de8",
-        "Node name for S&R": "BatchResultCollector",
-        "widget_ue_connectable": {}
-      },
-      "widgets_values": [
-        true,
-        "batch_video/batch",
-        30,
-        "mp4",
-        false
-      ]
-    },
-    {
-      "id": 85,
-      "type": "BatchImageProcessor",
-      "pos": [
-        181.67674255371094,
-        2532.96630859375
-      ],
-      "size": [
-        378,
-        102
-      ],
-      "flags": {},
-      "order": 19,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 200
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            195
-          ]
-        },
-        {
-          "name": "batch_info",
-          "type": "BATCH_INFO",
-          "links": [
-            188
-          ]
-        }
-      ],
-      "properties": {
-        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
-        "ver": "91017f76d80e829738853f366c2f89b7f21f8de8",
-        "Node name for S&R": "BatchImageProcessor",
-        "widget_ue_connectable": {}
-      },
-      "widgets_values": [
-        true,
-        false
-      ]
-    },
-    {
-      "id": 92,
-      "type": "ImageScale",
-      "pos": [
-        -270,
-        2490
-      ],
-      "size": [
-        315,
-        130
-      ],
-      "flags": {},
-      "order": 15,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 199
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            200
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.3.34",
-        "widget_ue_connectable": {},
-        "Node name for S&R": "ImageScale"
-      },
-      "widgets_values": [
-        "lanczos",
-        512,
-        512,
-        "center"
-      ]
-    },
-    {
       "id": 89,
       "type": "ImageScale",
       "pos": [
@@ -2368,7 +2145,7 @@
         124.8360366821289
       ],
       "flags": {},
-      "order": 10,
+      "order": 9,
       "mode": 0,
       "inputs": [],
       "outputs": [],
@@ -2378,6 +2155,229 @@
       ],
       "color": "#432",
       "bgcolor": "#653"
+    },
+    {
+      "id": 84,
+      "type": "BatchResultCollector",
+      "pos": [
+        8884.26171875,
+        2620.0791015625
+      ],
+      "size": [
+        390.5999755859375,
+        174
+      ],
+      "flags": {},
+      "order": 49,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 196
+        },
+        {
+          "name": "batch_info",
+          "type": "BATCH_INFO",
+          "link": 188
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "91017f76d80e829738853f366c2f89b7f21f8de8",
+        "Node name for S&R": "BatchResultCollector",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        true,
+        "batch_video/batch",
+        30,
+        "mp4",
+        false
+      ]
+    },
+    {
+      "id": 76,
+      "type": "VHS_LoadVideo",
+      "pos": [
+        -933.0139770507812,
+        2530.957275390625
+      ],
+      "size": [
+        247.455078125,
+        452.2566223144531
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "meta_batch",
+          "shape": 7,
+          "type": "VHS_BatchManager",
+          "link": null
+        },
+        {
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            202
+          ]
+        },
+        {
+          "name": "frame_count",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": null
+        },
+        {
+          "name": "video_info",
+          "type": "VHS_VIDEOINFO",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-videohelpersuite",
+        "ver": "1.6.1",
+        "Node name for S&R": "VHS_LoadVideo",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": {
+        "video": "pinching.mp4",
+        "force_rate": 0,
+        "custom_width": 0,
+        "custom_height": 0,
+        "frame_load_cap": 60,
+        "skip_first_frames": 0,
+        "select_every_nth": 1,
+        "format": "AnimateDiff",
+        "choose video to upload": "image",
+        "videopreview": {
+          "hidden": false,
+          "paused": false,
+          "params": {
+            "filename": "pinching.mp4",
+            "type": "input",
+            "format": "video/mp4",
+            "force_rate": 0,
+            "custom_width": 0,
+            "custom_height": 0,
+            "frame_load_cap": 60,
+            "skip_first_frames": 0,
+            "select_every_nth": 1
+          }
+        }
+      }
+    },
+    {
+      "id": 93,
+      "type": "ImageScale",
+      "pos": [
+        -484.8045349121094,
+        2515.98046875
+      ],
+      "size": [
+        315,
+        130
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 202
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            203
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.34",
+        "widget_ue_connectable": {},
+        "Node name for S&R": "ImageScale"
+      },
+      "widgets_values": [
+        "nearest-exact",
+        512,
+        512,
+        "center"
+      ]
+    },
+    {
+      "id": 85,
+      "type": "BatchImageProcessor",
+      "pos": [
+        181.67674255371094,
+        2532.96630859375
+      ],
+      "size": [
+        378,
+        102
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 203
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            195
+          ]
+        },
+        {
+          "name": "batch_info",
+          "type": "BATCH_INFO",
+          "links": [
+            188
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "91017f76d80e829738853f366c2f89b7f21f8de8",
+        "Node name for S&R": "BatchImageProcessor",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        true,
+        false
+      ]
     }
   ],
   "links": [
@@ -2966,16 +2966,16 @@
       "IMAGE"
     ],
     [
-      199,
+      202,
       76,
       0,
-      92,
+      93,
       0,
       "IMAGE"
     ],
     [
-      200,
-      92,
+      203,
+      93,
       0,
       85,
       0,
@@ -3052,10 +3052,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.12100000000000163,
+      "scale": 0.12100000000000231,
       "offset": [
-        2342.9131356596554,
-        2264.162347066301
+        1583.2325724559685,
+        1701.4048752808008
       ]
     },
     "ue_links": [],

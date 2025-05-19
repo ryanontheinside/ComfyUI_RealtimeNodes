@@ -41,8 +41,6 @@ class BatchImageProcessor(ControlNodeBase):
     CATEGORY = "Realtime Nodes/media/batch"
     DESCRIPTION = "Feeds images one by one from a batch into the workflow. Must be used in conjunction with BatchResultCollector node."
     def update(self, images, reset, always_execute=True, unique_id=None):
-        print(f"[BatchImageProcessor] Unique ID: {unique_id}")
-        print(f"[BatchImageProcessor] Input images tensor shape: {images.shape}")
         
         # Use class static variable to persist state
         if unique_id not in self.__class__._global_state:
@@ -62,7 +60,6 @@ class BatchImageProcessor(ControlNodeBase):
         # Get current image (preserving batch dimension)
         current_index = state["current_index"]
         current_image = images[current_index:current_index+1]
-        print(f"[BatchImageProcessor] Current image tensor shape: {current_image.shape}")
         
         # Prepare batch info
         is_last_frame = current_index == state["total_frames"] - 1
@@ -75,7 +72,6 @@ class BatchImageProcessor(ControlNodeBase):
         # Update index for next run
         state["current_index"] = (current_index + 1) % state["total_frames"]
         print(f"[BatchImageProcessor] Processing frame {current_index+1}/{state['total_frames']} (is_last_frame: {is_last_frame})")
-        print(f"[BatchImageProcessor] Next frame index will be: {state['current_index']}")
         
         return (current_image, batch_info)
 
@@ -105,10 +101,7 @@ class BatchResultCollector(ControlNodeBase):
     OUTPUT_NODE = True
     DESCRIPTION = "Collects frames from a batch and saves them as a video when the last frame is received. If the last frame is not received, the node will block execution until it is received. Must be used in conjunction with BatchImageProcessor node."
     def update(self, image, batch_info, filename_prefix, fps, format, reset, always_execute=True, unique_id=None):
-        print(f"[BatchResultCollector] Unique ID: {unique_id}")
-        print(f"[BatchResultCollector] Received frame {batch_info.current_index+1}/{batch_info.total_frames} (is_last_frame: {batch_info.is_last_frame})")
-        print(f"[BatchResultCollector] Input image tensor shape: {image.shape}")
-        
+      
         # Create default state structure
         default_state = {
             "collected_frames": [],
@@ -147,15 +140,9 @@ class BatchResultCollector(ControlNodeBase):
             state["current_index"] = current_index
             # Ensure the array is large enough
             if len(state["collected_frames"]) <= current_index:
-                print(f"[BatchResultCollector] Extending collected_frames array from {len(state['collected_frames'])} to {current_index+1}")
                 state["collected_frames"].extend([None] * (current_index - len(state["collected_frames"]) + 1))
             # Make a copy and store the frame
             state["collected_frames"][current_index] = image.clone().cpu()
-            print(f"[BatchResultCollector] Stored frame {current_index+1}/{total_frames}, shape: {state['collected_frames'][current_index].shape}")
-        
-        # Debug info for collected frames
-        frame_status = ["✓" if f is not None else "✗" for f in state["collected_frames"]]
-        print(f"[BatchResultCollector] Frame collection status: {frame_status}")
         
         # Check if all frames collected
         collected_count = sum(1 for frame in state["collected_frames"] if frame is not None)
@@ -176,12 +163,6 @@ class BatchResultCollector(ControlNodeBase):
                 print(f"[BatchResultCollector] Successfully saved video. Stopping auto-queue.")
                 raise Exception("Processing complete. Disable auto-queue.")
             
-        else:
-            if batch_info.is_last_frame:
-                print(f"[BatchResultCollector] Last frame received but not all frames collected yet")
-            if all_frames_collected:
-                print(f"[BatchResultCollector] All frames collected but not receiving last frame yet")
-        
         return (image,)
     
     def _save_frames_as_images(self, frames, filename_prefix, output_dir):
@@ -312,18 +293,12 @@ class BatchResultCollector(ControlNodeBase):
             # Generate timestamp for unique filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            # Print details of the first frame for debugging
-            print(f"[BatchResultCollector] First frame type: {type(frames[0])}")
-            print(f"[BatchResultCollector] First frame tensor shape: {frames[0].shape}")
-            
             # Get video dimensions from the first frame
             first_frame = frames[0]
             if len(first_frame.shape) == 4:  # Handle [B,H,W,C] format
                 height, width = first_frame.shape[1], first_frame.shape[2]
             else:  # Handle [H,W,C] format
                 height, width = first_frame.shape[0], first_frame.shape[1]
-                
-            print(f"[BatchResultCollector] Video dimensions determined: {width}x{height}")
             
             # Get save path
             full_output_folder, filename, counter, subfolder, _ = folder_paths.get_save_image_path(
@@ -357,27 +332,16 @@ class BatchResultCollector(ControlNodeBase):
                 if not out.isOpened():
                     raise Exception(f"Failed to open video writer with any codec for format {format}")
             
-            print(f"[BatchResultCollector] Created video writer with dimensions {width}x{height} at {fps} fps")
-            
             # Write frames
             frames_encoded = 0
             for i, frame_tensor in enumerate(frames):
-                print(f"[BatchResultCollector] Processing frame {i+1}/{len(frames)}")
-                print(f"[BatchResultCollector] Frame tensor shape: {frame_tensor.shape}")
-                
                 # Remove batch dimension if present (B,H,W,C) -> (H,W,C)
                 if len(frame_tensor.shape) == 4:
                     frame_tensor = frame_tensor.squeeze(0)
-                    print(f"[BatchResultCollector] After removing batch dimension: {frame_tensor.shape}")
                 
                 # Convert tensor to numpy array with values in [0-255]
                 frame_np = torch.clamp(frame_tensor * 255, min=0, max=255).to(torch.uint8).cpu().numpy()
-                print(f"[BatchResultCollector] NumPy array shape: {frame_np.shape}")
                 
-                # Make sure we have the expected dimensions
-                if frame_np.shape[0] != height or frame_np.shape[1] != width:
-                    print(f"[BatchResultCollector] Warning: Frame dimensions don't match expected {height}x{width}")
-                    
                 # Convert RGB to BGR for OpenCV
                 frame_bgr = cv2.cvtColor(frame_np, cv2.COLOR_RGB2BGR)
                 
