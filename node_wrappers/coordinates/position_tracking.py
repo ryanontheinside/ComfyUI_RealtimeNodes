@@ -80,7 +80,7 @@ class CoordinateDeltaControlNode(BaseCoordinateDelta):
             "x": x_in, "y": y_in, "z": z_in, "delta_min": delta_min, 
             "delta_max": delta_max, "output_min": output_min, "output_max": output_max, "clamp": clamp
         }
-        if not coordinate_utils.check_required_arguments(required_args, self.__class__.__name__):
+        if None in required_args.values():
             return (fallback_value,)
 
         # Validate input types
@@ -92,14 +92,14 @@ class CoordinateDeltaControlNode(BaseCoordinateDelta):
             coordinate_utils.cleanup_coordinate_histories(self._histories, current_batch_size, self.__class__.__name__)
 
             # Handle empty lists
-            if coordinate_utils.handle_empty_coordinate_lists(current_batch_size, self.__class__.__name__):
+            if current_batch_size == 0:
                 return ([],)
 
             # Process List Input
             results = []
             for i in range(current_batch_size):
                 xi, yi, zi = x_in[i], y_in[i], z_in[i]
-                if not coordinate_utils.validate_coordinate_types_in_list([[xi], [yi], [zi]], 0, self.__class__.__name__):
+                if not all(isinstance(c, (float, int)) for c in [xi, yi, zi]):
                     results.append(fallback_value)
                     continue
 
@@ -118,7 +118,7 @@ class CoordinateDeltaControlNode(BaseCoordinateDelta):
             coordinate_utils.cleanup_single_input_histories(self._histories, self.__class__.__name__)
 
             # Validate single coordinate types
-            if not coordinate_utils.validate_single_coordinate_types(x_in, y_in, z_in, self.__class__.__name__):
+            if not all(isinstance(c, (float, int)) for c in [x_in, y_in, z_in]):
                 return (fallback_value,)
 
             raw_delta = self._get_position_delta(float(x_in), float(y_in), float(z_in), window_size, item_index=0)
@@ -184,7 +184,7 @@ class CoordinateDeltaTriggerNode(BaseCoordinateDelta):
         required_args = {
             "x": x_in, "y": y_in, "z": z_in, "threshold": threshold, "condition": condition
         }
-        if not coordinate_utils.check_required_arguments(required_args, self.__class__.__name__):
+        if None in required_args.values():
             return (fallback_value,)
 
         # Validate input types
@@ -196,14 +196,14 @@ class CoordinateDeltaTriggerNode(BaseCoordinateDelta):
             coordinate_utils.cleanup_coordinate_histories(self._histories, current_batch_size, self.__class__.__name__)
 
             # Handle empty lists
-            if coordinate_utils.handle_empty_coordinate_lists(current_batch_size, self.__class__.__name__):
+            if current_batch_size == 0:
                 return ([],)
 
             # Process List Input
             results = []
             for i in range(current_batch_size):
                 xi, yi, zi = x_in[i], y_in[i], z_in[i]
-                if not coordinate_utils.validate_coordinate_types_in_list([[xi], [yi], [zi]], 0, self.__class__.__name__):
+                if not all(isinstance(c, (float, int)) for c in [xi, yi, zi]):
                     results.append(fallback_value)
                     continue
 
@@ -226,7 +226,7 @@ class CoordinateDeltaTriggerNode(BaseCoordinateDelta):
             coordinate_utils.cleanup_single_input_histories(self._histories, self.__class__.__name__)
 
             # Validate single coordinate types
-            if not coordinate_utils.validate_single_coordinate_types(x_in, y_in, z_in, self.__class__.__name__):
+            if not all(isinstance(c, (float, int)) for c in [x_in, y_in, z_in]):
                 return (fallback_value,)
 
             raw_delta = self._get_position_delta(float(x_in), float(y_in), float(z_in), window_size, item_index=0)
@@ -416,7 +416,7 @@ class MaskFromCoordinate:
             yi = y_list[i]
 
             # Validate individual coordinates
-            if not coordinate_utils.validate_individual_mask_coordinates(xi, yi, i, self.__class__.__name__):
+            if not isinstance(xi, (float, int)) or not isinstance(yi, (float, int)):
                 mask_tensor = torch.zeros((1, height, width), dtype=torch.float32, device=device)
                 output_masks.append(mask_tensor)
                 continue
