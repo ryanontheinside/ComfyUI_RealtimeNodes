@@ -20,6 +20,24 @@ class CoordinateSystem:
     NORMALIZED = "normalized"  # 0.0-1.0 range
     PIXEL = "pixel"  # Pixel coordinates
 
+    # Cache for dimension tensors to avoid repeated creation
+    _dimension_cache = {}
+
+    @staticmethod
+    def _get_dimension_tensor(dimensions: Union[int, Tuple[int, ...]], device: torch.device) -> torch.Tensor:
+        """Get cached dimension tensor or create new one."""
+        cache_key = (dimensions, device)
+        if cache_key not in CoordinateSystem._dimension_cache:
+            if isinstance(dimensions, tuple):
+                CoordinateSystem._dimension_cache[cache_key] = torch.tensor(dimensions, device=device, dtype=torch.float32)
+            else:
+                CoordinateSystem._dimension_cache[cache_key] = torch.tensor([dimensions], device=device, dtype=torch.float32)
+        return CoordinateSystem._dimension_cache[cache_key]
+
+    @staticmethod
+    def clear_cache():
+        CoordinateSystem._dimension_cache.clear()
+
     @staticmethod
     def normalize(
         coords: Union[float, List[float], torch.Tensor],
@@ -40,36 +58,39 @@ class CoordinateSystem:
         if input_space == CoordinateSystem.NORMALIZED:
             return coords
 
-        # Handle different dimension specifications
-        if isinstance(dimensions, tuple):
-            dim_size = dimensions[0] if len(dimensions) == 1 else dimensions
-        else:
-            dim_size = dimensions
-
-        # Handle different input types
-        if isinstance(coords, list):
-            if isinstance(dim_size, tuple):
-                # Multiple dimensions
-                if len(coords) % len(dim_size) != 0:
-                    logger.warning(f"Coordinates length {len(coords)} not divisible by dimensions length {len(dim_size)}")
+        # Handle different input types with optimized paths
+        if isinstance(coords, torch.Tensor):
+            # Optimized tensor path - avoid device transfers
+            if isinstance(dimensions, tuple):
+                if coords.shape[-1] != len(dimensions):
+                    raise ValueError(f"Tensor last dimension {coords.shape[-1]} doesn't match dimensions {len(dimensions)}")
+                dim_tensor = CoordinateSystem._get_dimension_tensor(dimensions, coords.device)
+                return coords.float() / dim_tensor
+            else:
+                return coords.float() / float(dimensions)
+        
+        elif isinstance(coords, list):
+            if not coords:  # Empty list optimization
+                return coords
+            
+            if isinstance(dimensions, tuple):
+                # Vectorized list processing
+                dim_list = list(dimensions)
                 result = []
                 for i, c in enumerate(coords):
-                    dim_idx = i % len(dim_size)
-                    result.append(float(c) / dim_size[dim_idx])
+                    dim_idx = i % len(dim_list)
+                    result.append(float(c) / dim_list[dim_idx])
                 return result
             else:
-                # Single dimension
-                return [float(c) / dim_size for c in coords]
-        elif isinstance(coords, torch.Tensor):
-            if isinstance(dim_size, tuple):
-                # Tensor with shape handling
-                if coords.shape[-1] != len(dim_size):
-                    raise ValueError(f"Tensor last dimension {coords.shape[-1]} doesn't match dimensions {len(dim_size)}")
-                return coords.float() / torch.tensor(dim_size, device=coords.device)
-            else:
-                return coords.float() / dim_size
+                # Single dimension - vectorized division
+                dim_float = float(dimensions)
+                return [float(c) / dim_float for c in coords]
         else:
-            return float(coords) / dim_size
+            # Single value
+            if isinstance(dimensions, tuple):
+                return float(coords) / dimensions[0]
+            else:
+                return float(coords) / dimensions
 
     @staticmethod
     def denormalize(
@@ -91,37 +112,42 @@ class CoordinateSystem:
         if output_space == CoordinateSystem.NORMALIZED:
             return coords
 
-        # Handle different dimension specifications
-        if isinstance(dimensions, tuple):
-            dim_size = dimensions[0] if len(dimensions) == 1 else dimensions
-        else:
-            dim_size = dimensions
-
-        # Handle different input types
-        if isinstance(coords, list):
-            if isinstance(dim_size, tuple):
-                # Multiple dimensions
-                if len(coords) % len(dim_size) != 0:
-                    logger.warning(f"Coordinates length {len(coords)} not divisible by dimensions length {len(dim_size)}")
-                result = []
-                for i, c in enumerate(coords):
-                    dim_idx = i % len(dim_size)
-                    result.append(float(max(0, min(dim_size[dim_idx] - 1, c * dim_size[dim_idx]))))
-                return result
-            else:
-                # Single dimension
-                return [float(max(0, min(dim_size - 1, c * dim_size))) for c in coords]
-        elif isinstance(coords, torch.Tensor):
-            if isinstance(dim_size, tuple):
-                # Tensor with shape handling
-                if coords.shape[-1] != len(dim_size):
-                    raise ValueError(f"Tensor last dimension {coords.shape[-1]} doesn't match dimensions {len(dim_size)}")
-                dim_tensor = torch.tensor(dim_size, device=coords.device)
+        # Handle different input types with optimized paths
+        if isinstance(coords, torch.Tensor):
+            # Optimized tensor path
+            if isinstance(dimensions, tuple):
+                if coords.shape[-1] != len(dimensions):
+                    raise ValueError(f"Tensor last dimension {coords.shape[-1]} doesn't match dimensions {len(dimensions)}")
+                dim_tensor = CoordinateSystem._get_dimension_tensor(dimensions, coords.device)
                 return torch.clamp(coords * dim_tensor, 0, dim_tensor - 1)
             else:
-                return torch.clamp(coords * dim_size, 0, dim_size - 1)
+                dim_float = float(dimensions)
+                return torch.clamp(coords * dim_float, 0, dim_float - 1)
+        
+        elif isinstance(coords, list):
+            if not coords:  # Empty list optimization
+                return coords
+            
+            if isinstance(dimensions, tuple):
+                # Vectorized list processing with bounds checking
+                dim_list = list(dimensions)
+                result = []
+                for i, c in enumerate(coords):
+                    dim_idx = i % len(dim_list)
+                    dim_val = dim_list[dim_idx]
+                    result.append(float(max(0, min(dim_val - 1, c * dim_val))))
+                return result
+            else:
+                # Single dimension - vectorized processing
+                dim_float = float(dimensions)
+                return [float(max(0, min(dim_float - 1, c * dim_float))) for c in coords]
         else:
-            return float(max(0, min(dim_size - 1, coords * dim_size)))
+            # Single value
+            if isinstance(dimensions, tuple):
+                dim_val = dimensions[0]
+                return float(max(0, min(dim_val - 1, coords * dim_val)))
+            else:
+                return float(max(0, min(dimensions - 1, coords * dimensions)))
 
     @staticmethod
     def convert(
@@ -145,17 +171,22 @@ class CoordinateSystem:
         if from_space == to_space:
             return coords
 
-        # First normalize if needed
-        if from_space != CoordinateSystem.NORMALIZED:
-            normalized = CoordinateSystem.normalize(coords, dimensions, from_space)
+        # Direct conversion path when possible
+        if from_space == CoordinateSystem.PIXEL and to_space == CoordinateSystem.NORMALIZED:
+            return CoordinateSystem.normalize(coords, dimensions, from_space)
+        elif from_space == CoordinateSystem.NORMALIZED and to_space == CoordinateSystem.PIXEL:
+            return CoordinateSystem.denormalize(coords, dimensions, to_space)
         else:
-            normalized = coords
+            # Two-step conversion (less common)
+            if from_space != CoordinateSystem.NORMALIZED:
+                normalized = CoordinateSystem.normalize(coords, dimensions, from_space)
+            else:
+                normalized = coords
 
-        # Then denormalize to target space if needed
-        if to_space != CoordinateSystem.NORMALIZED:
-            return CoordinateSystem.denormalize(normalized, dimensions, to_space)
-        else:
-            return normalized
+            if to_space != CoordinateSystem.NORMALIZED:
+                return CoordinateSystem.denormalize(normalized, dimensions, to_space)
+            else:
+                return normalized
 
     @staticmethod
     def get_dimensions_from_tensor(tensor: torch.Tensor) -> Tuple[int, int]:
