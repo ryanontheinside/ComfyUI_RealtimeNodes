@@ -7,6 +7,7 @@ import numpy as np
 import torch
 
 from ...src.coordinates.coordinate_delta import BaseCoordinateDelta, MAX_POSITION_HISTORY, FLOAT_EQUALITY_TOLERANCE
+from ...src.coordinates import coordinate_utils
 
 # TODO: consider moving base nodes to src
 # Import from the new consolidated utilities
@@ -74,26 +75,24 @@ class CoordinateDeltaControlNode(BaseCoordinateDelta):
         clamp = kwargs.get("clamp")
         fallback_value = int(output_min) if self.IS_INT_OUTPUT else float(output_min)
 
-        if None in [x_in, y_in, z_in, delta_min, delta_max, output_min, output_max, clamp]:
-            logger.error(f"{self.__class__.__name__}: Missing required arguments.")
+        # Check required arguments
+        required_args = {
+            "x": x_in, "y": y_in, "z": z_in, "delta_min": delta_min, 
+            "delta_max": delta_max, "output_min": output_min, "output_max": output_max, "clamp": clamp
+        }
+        if None in required_args.values():
             return (fallback_value,)
 
-        # --- Input Type Handling & History Cleanup ---
-        is_list = isinstance(x_in, list)
-        if is_list != isinstance(y_in, list) or is_list != isinstance(z_in, list):
-            raise ValueError(f"{self.__class__.__name__}: Inputs x, y, z must be all floats or all lists.")
+        # Validate input types
+        is_list = coordinate_utils.validate_coordinate_input_types(x_in, y_in, z_in, self.__class__.__name__)
 
         if is_list:
             current_batch_size = len(x_in)
-            # Remove histories for indices no longer present
-            keys_to_remove = [k for k in self._histories if k >= current_batch_size]
-            if keys_to_remove:
-                # logger.debug(f"{self.__class__.__name__}: Removing histories for indices {keys_to_remove}")
-                for k in keys_to_remove:
-                    del self._histories[k]
+            # Clean up histories
+            coordinate_utils.cleanup_coordinate_histories(self._histories, current_batch_size, self.__class__.__name__)
 
+            # Handle empty lists
             if current_batch_size == 0:
-                logger.warning(f"{self.__class__.__name__}: Received empty lists for coordinates.")
                 return ([],)
 
             # Process List Input
@@ -101,7 +100,6 @@ class CoordinateDeltaControlNode(BaseCoordinateDelta):
             for i in range(current_batch_size):
                 xi, yi, zi = x_in[i], y_in[i], z_in[i]
                 if not all(isinstance(c, (float, int)) for c in [xi, yi, zi]):
-                    logger.warning(f"{self.__class__.__name__}: Invalid coordinate type at index {i}. Using fallback value.")
                     results.append(fallback_value)
                     continue
 
@@ -116,16 +114,11 @@ class CoordinateDeltaControlNode(BaseCoordinateDelta):
             return (results,)
 
         else:
-            # Single Float Input: Remove all histories except for index 0
-            keys_to_remove = [k for k in self._histories if k != 0]
-            if keys_to_remove:
-                # logger.debug(f"{self.__class__.__name__}: Switching to single input, removing histories for indices {keys_to_remove}")
-                for k in keys_to_remove:
-                    del self._histories[k]
+            # Clean up single input histories
+            coordinate_utils.cleanup_single_input_histories(self._histories, self.__class__.__name__)
 
-            # Process Single Float Input
+            # Validate single coordinate types
             if not all(isinstance(c, (float, int)) for c in [x_in, y_in, z_in]):
-                logger.error(f"{self.__class__.__name__}: Invalid coordinate types for single float input.")
                 return (fallback_value,)
 
             raw_delta = self._get_position_delta(float(x_in), float(y_in), float(z_in), window_size, item_index=0)
@@ -187,26 +180,23 @@ class CoordinateDeltaTriggerNode(BaseCoordinateDelta):
         condition = kwargs.get("condition")
         fallback_value = False
 
-        if None in [x_in, y_in, z_in, threshold, condition]:
-            logger.error(f"{self.__class__.__name__}: Missing required arguments.")
+        # Check required arguments
+        required_args = {
+            "x": x_in, "y": y_in, "z": z_in, "threshold": threshold, "condition": condition
+        }
+        if None in required_args.values():
             return (fallback_value,)
 
-        # --- Input Type Handling & History Cleanup ---
-        is_list = isinstance(x_in, list)
-        if is_list != isinstance(y_in, list) or is_list != isinstance(z_in, list):
-            raise ValueError(f"{self.__class__.__name__}: Inputs x, y, z must be all floats or all lists.")
+        # Validate input types
+        is_list = coordinate_utils.validate_coordinate_input_types(x_in, y_in, z_in, self.__class__.__name__)
 
         if is_list:
             current_batch_size = len(x_in)
-            # Remove histories for indices no longer present
-            keys_to_remove = [k for k in self._histories if k >= current_batch_size]
-            if keys_to_remove:
-                # logger.debug(f"{self.__class__.__name__}: Removing histories for indices {keys_to_remove}")
-                for k in keys_to_remove:
-                    del self._histories[k]
+            # Clean up histories
+            coordinate_utils.cleanup_coordinate_histories(self._histories, current_batch_size, self.__class__.__name__)
 
+            # Handle empty lists
             if current_batch_size == 0:
-                logger.warning(f"{self.__class__.__name__}: Received empty lists for coordinates.")
                 return ([],)
 
             # Process List Input
@@ -214,7 +204,6 @@ class CoordinateDeltaTriggerNode(BaseCoordinateDelta):
             for i in range(current_batch_size):
                 xi, yi, zi = x_in[i], y_in[i], z_in[i]
                 if not all(isinstance(c, (float, int)) for c in [xi, yi, zi]):
-                    logger.warning(f"{self.__class__.__name__}: Invalid coordinate type at index {i}. Using fallback value.")
                     results.append(fallback_value)
                     continue
 
@@ -233,16 +222,11 @@ class CoordinateDeltaTriggerNode(BaseCoordinateDelta):
             return (results,)
 
         else:
-            # Single Float Input: Remove all histories except for index 0
-            keys_to_remove = [k for k in self._histories if k != 0]
-            if keys_to_remove:
-                # logger.debug(f"{self.__class__.__name__}: Switching to single input, removing histories for indices {keys_to_remove}")
-                for k in keys_to_remove:
-                    del self._histories[k]
+            # Clean up single input histories
+            coordinate_utils.cleanup_single_input_histories(self._histories, self.__class__.__name__)
 
-            # Process Single Float Input
+            # Validate single coordinate types
             if not all(isinstance(c, (float, int)) for c in [x_in, y_in, z_in]):
-                logger.error(f"{self.__class__.__name__}: Invalid coordinate types for single float input.")
                 return (fallback_value,)
 
             raw_delta = self._get_position_delta(float(x_in), float(y_in), float(z_in), window_size, item_index=0)
@@ -296,22 +280,18 @@ class CoordinateProximityNode:
         y2: Union[float, List[float]],
         z2: Union[float, List[float]],
     ) -> Union[float, List[float]]:  # Return type hint updated
-        # --- Input Type Handling ---
+        # Validate inputs
         inputs = [x1, y1, z1, x2, y2, z2]
-        is_list_input = isinstance(x1, list)
+        is_empty, list_len = coordinate_utils.validate_proximity_inputs(inputs, self.__class__.__name__)
         fallback_value = 0.0
+        
+        if is_empty:
+            return ([],)  # Return empty list for FLOAT type
 
-        if any(isinstance(inp, list) != is_list_input for inp in inputs):
-            raise ValueError("All coordinate inputs (x1..z2) must be of the same type (all floats or all lists).")
+        is_list_input = isinstance(x1, list)
 
         if is_list_input:
             # Process List Input
-            list_len = len(x1)
-            if any(len(inp) != list_len for inp in inputs if isinstance(inp, list)):
-                raise ValueError("If inputs are lists, all coordinate lists (x1..z2) must have the same length.")
-            if list_len == 0:
-                logger.warning("Input coordinate lists are empty. Returning empty distance list.")
-                return ([],)  # Return empty list for FLOAT type
             num_calcs = list_len
             x1_list, y1_list, z1_list = x1, y1, z1
             x2_list, y2_list, z2_list = x2, y2, z2
@@ -399,28 +379,22 @@ class MaskFromCoordinate:
         shape: str,
         invert: bool,
     ) -> Tuple[torch.Tensor]:
-        # --- Input Type Handling ---
+        # Validate coordinate inputs
+        is_empty, num_coords = coordinate_utils.validate_mask_coordinate_inputs(x, y, self.__class__.__name__)
+        
+        if is_empty:
+            # Determine shape for empty tensor
+            if image_for_dimensions.dim() != 4:
+                logger.error("Input image must be BHWC format to determine empty mask size.")
+                return (torch.zeros((0, 1, 64, 64), dtype=torch.float32),)
+            _, height, width, _ = image_for_dimensions.shape
+            return (torch.zeros((0, 1, height, width), dtype=torch.float32, device=image_for_dimensions.device),)
+
         is_x_list = isinstance(x, list)
-        is_y_list = isinstance(y, list)
-
-        if is_x_list != is_y_list:
-            raise ValueError("Inputs x and y must be both floats or both lists.")
-
         if is_x_list:
             # Input is List[float]
             x_list = x
             y_list = y
-            if len(x_list) != len(y_list):
-                raise ValueError(f"x_list (len {len(x_list)}) and y_list (len {len(y_list)}) must have the same length.")
-            if not x_list:  # Handle empty list
-                logger.warning("Input coordinate lists are empty. Returning empty mask batch.")
-                # Determine shape for empty tensor
-                if image_for_dimensions.dim() != 4:
-                    logger.error("Input image must be BHWC format to determine empty mask size.")
-                    return (torch.zeros((0, 1, 64, 64), dtype=torch.float32),)
-                _, height, width, _ = image_for_dimensions.shape
-                return (torch.zeros((0, 1, height, width), dtype=torch.float32, device=image_for_dimensions.device),)
-            num_coords = len(x_list)
         else:
             # Input is float - wrap in lists for unified processing
             x_list = [x]
@@ -443,9 +417,6 @@ class MaskFromCoordinate:
 
             # Validate individual coordinates
             if not isinstance(xi, (float, int)) or not isinstance(yi, (float, int)):
-                logger.warning(
-                    f"Invalid coordinate type at index {i} (x={type(xi)}, y={type(yi)}). Skipping mask generation for this index."
-                )
                 mask_tensor = torch.zeros((1, height, width), dtype=torch.float32, device=device)
                 output_masks.append(mask_tensor)
                 continue

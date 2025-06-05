@@ -4,6 +4,7 @@ from typing import List, Union
 import torch
 
 from ...src.coordinates import CoordinateSystem, DrawingEngine
+from ...src.coordinates import coordinate_utils, drawing_utils
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +59,9 @@ class RTDrawPointsNode:
         batch_mapping: str = "broadcast",
     ):
         """Draw points efficiently using the DrawingEngine."""
-        # Use the coordinate system to ensure proper handling
-        space = CoordinateSystem.NORMALIZED if is_normalized else CoordinateSystem.PIXEL
-        dimensions = CoordinateSystem.get_dimensions_from_tensor(image)
-
-        drawing_engine = DrawingEngine()
+        # Setup drawing engine and coordinate system
+        drawing_engine, space, dimensions = drawing_utils.setup_drawing_engine_and_coordinates(image, is_normalized)
+        
         return (
             drawing_engine.draw_points(
                 image=image,
@@ -168,63 +167,38 @@ class RTDrawLinesNode:
         batch_value_mode: str = "Index-based",
     ):
         """Draw lines efficiently using the DrawingEngine."""
-        # Use the coordinate system to ensure proper handling
-        space = CoordinateSystem.NORMALIZED if is_normalized else CoordinateSystem.PIXEL
-        dimensions = CoordinateSystem.get_dimensions_from_tensor(image)
+        # Setup drawing engine and coordinate system
+        drawing_engine, space, dimensions = drawing_utils.setup_drawing_engine_and_coordinates(image, is_normalized)
 
         # Parse the values list
-        values_list = []
-        if label_values and label_values.strip():
-            values_list = [v.strip() for v in label_values.split(',')]
+        values_list = coordinate_utils.parse_label_values(label_values)
         
-        # Get the batch size
-        batch_size = image.shape[0]
-        
-        # Process images individually to apply different labels
-        output_batch = image.clone()
-        drawing_engine = DrawingEngine()
+        # Setup batch drawing
+        batch_size, output_batch = drawing_utils.setup_batch_drawing(image)
         
         # Standardize inputs to lists
-        x1_list = x1 if isinstance(x1, list) else [x1]
-        y1_list = y1 if isinstance(y1, list) else [y1]
-        x2_list = x2 if isinstance(x2, list) else [x2]
-        y2_list = y2 if isinstance(y2, list) else [y2]
+        x1_list, y1_list, x2_list, y2_list = coordinate_utils.standardize_inputs_to_lists(x1, y1, x2, y2)
         
         # Process each batch item
         for b in range(batch_size):
-            # Create a single-item tensor for this batch
-            single_image = output_batch[b:b+1]
-            
             # Handle different batch mapping strategies for coordinates
+            coord_lists = [x1_list, y1_list, x2_list, y2_list]
+            should_skip, batch_coords = drawing_utils.handle_batch_mapping_coordinates(b, batch_mapping, coord_lists, batch_size)
+            
+            if should_skip:
+                continue
+                
             if batch_mapping == "one-to-one":
-                # One-to-one: each batch item gets one coordinate
-                if b < len(x1_list):
-                    batch_x1 = x1_list[b]
-                    batch_y1 = y1_list[b]
-                    batch_x2 = x2_list[b]
-                    batch_y2 = y2_list[b]
-                else:
-                    continue  # Skip if not enough coordinates
-            elif batch_mapping == "all-on-first" and b > 0:
-                continue  # Skip all but the first item
+                batch_x1, batch_y1, batch_x2, batch_y2 = batch_coords
             else:
                 # Broadcast: all coordinates on all batches
-                batch_x1 = x1_list
-                batch_y1 = y1_list
-                batch_x2 = x2_list
-                batch_y2 = y2_list
+                batch_x1, batch_y1, batch_x2, batch_y2 = batch_coords
             
             # Determine the label for this batch
-            if values_list:
-                if batch_value_mode == "Index-based" and b < len(values_list):
-                    # Use batch index to select value
-                    current_value = values_list[b]
-                else:
-                    # Default to first value
-                    current_value = values_list[0]
-                current_label = f"{label_prefix}: {current_value}"
-            else:
-                current_label = label_prefix
+            current_label = coordinate_utils.determine_batch_label(values_list, b, label_prefix, batch_value_mode)
+            
+            # Create a single-item tensor for this batch
+            single_image = output_batch[b:b+1]
             
             # Process this batch item
             result = drawing_engine.draw_lines(
@@ -325,21 +299,14 @@ class RTDrawPolygonNode:
         batch_value_mode: str = "Index-based",
     ):
         """Draw polygon efficiently using the DrawingEngine."""
-        # Use the coordinate system to ensure proper handling
-        space = CoordinateSystem.NORMALIZED if is_normalized else CoordinateSystem.PIXEL
-        dimensions = CoordinateSystem.get_dimensions_from_tensor(image)
+        # Setup drawing engine and coordinate system
+        drawing_engine, space, dimensions = drawing_utils.setup_drawing_engine_and_coordinates(image, is_normalized)
 
         # Parse the values list
-        values_list = []
-        if label_values and label_values.strip():
-            values_list = [v.strip() for v in label_values.split(',')]
+        values_list = coordinate_utils.parse_label_values(label_values)
         
-        # Get the batch size
-        batch_size = image.shape[0]
-        
-        # Process images individually to apply different labels
-        output_batch = image.clone()
-        drawing_engine = DrawingEngine()
+        # Setup batch drawing
+        batch_size, output_batch = drawing_utils.setup_batch_drawing(image)
         
         # Process each batch item
         for b in range(batch_size):
@@ -347,20 +314,11 @@ class RTDrawPolygonNode:
             if batch_mapping == "all-on-first" and b > 0:
                 continue
                 
+            # Determine the label for this batch
+            current_label = coordinate_utils.determine_batch_label(values_list, b, label_prefix, batch_value_mode)
+            
             # Create a single-item tensor for this batch
             single_image = output_batch[b:b+1]
-            
-            # Determine the label for this batch
-            if values_list:
-                if batch_value_mode == "Index-based" and b < len(values_list):
-                    # Use batch index to select value
-                    current_value = values_list[b]
-                else:
-                    # Default to first value
-                    current_value = values_list[0]
-                current_label = f"{label_prefix}: {current_value}"
-            else:
-                current_label = label_prefix
             
             # Process this batch item
             result = drawing_engine.draw_polygon(
@@ -371,12 +329,11 @@ class RTDrawPolygonNode:
                 thickness=thickness,
                 fill=fill,
                 is_normalized=is_normalized,
-                batch_mapping=batch_mapping if batch_mapping != "one-to-one" else "broadcast",
+                batch_mapping="broadcast",  # Always broadcast within the single item
                 draw_vertices=draw_vertices,
                 vertex_radius=vertex_radius,
                 draw_label=draw_label,
                 label_text=current_label,
-                label_position="Center",  # Only center supported for polygons currently
                 font_scale=font_scale,
             )
             
@@ -411,16 +368,22 @@ class RTCoordinateConverterNode:
     def convert_coordinates(
         self, x: Union[float, List[float]], y: Union[float, List[float]], image_for_dimensions: torch.Tensor, mode: str
     ):
-        """Convert coordinates using the new coordinate system."""
-        dimensions = CoordinateSystem.get_dimensions_from_tensor(image_for_dimensions)
-
-        if mode == "Pixel to Normalized":
-            x_out = CoordinateSystem.normalize(x, dimensions[0], CoordinateSystem.PIXEL)
-            y_out = CoordinateSystem.normalize(y, dimensions[1], CoordinateSystem.PIXEL)
-        else:  # "Normalized to Pixel"
+        """Convert coordinates using the unified coordinate system."""
+        # Setup coordinate system
+        space, dimensions = coordinate_utils.get_coordinate_space_and_dimensions(mode == "normalized", image_for_dimensions)
+        
+        # Convert coordinates based on mode
+        if mode == "to_pixel":
             x_out = CoordinateSystem.denormalize(x, dimensions[0], CoordinateSystem.PIXEL)
             y_out = CoordinateSystem.denormalize(y, dimensions[1], CoordinateSystem.PIXEL)
-
+        elif mode == "to_normalized":
+            x_out = CoordinateSystem.normalize(x, dimensions[0], CoordinateSystem.PIXEL)
+            y_out = CoordinateSystem.normalize(y, dimensions[1], CoordinateSystem.PIXEL)
+        else:
+            # No conversion needed
+            x_out = x
+            y_out = y
+            
         return (x_out, y_out)
 
 
