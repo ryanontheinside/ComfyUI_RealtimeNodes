@@ -59,7 +59,7 @@
   "5": {
     "inputs": {
       "images": [
-        "40",
+        "55",
         0
       ]
     },
@@ -92,7 +92,7 @@
     "inputs": {
       "engine": "depth_anything_vitl14-fp16.engine",
       "images": [
-        "21",
+        "56",
         0
       ]
     },
@@ -140,7 +140,7 @@
   },
   "14": {
     "inputs": {
-      "seed": 245202513098312,
+      "seed": 249054118465047,
       "steps": 2,
       "cfg": 1,
       "sampler_name": "lcm",
@@ -206,15 +206,6 @@
     "class_type": "CLIPSetLastLayer",
     "_meta": {
       "title": "CLIP Set Last Layer"
-    }
-  },
-  "21": {
-    "inputs": {
-      "image": "example-512x512.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "Load Image"
     }
   },
   "22": {
@@ -286,7 +277,7 @@
       "min_presence_confidence": 0.5000000000000001,
       "min_tracking_confidence": 0.5000000000000001,
       "image": [
-        "21",
+        "56",
         0
       ],
       "model_info": [
@@ -340,15 +331,15 @@
   },
   "32": {
     "inputs": {
-      "value": [
-        "44",
-        0
-      ],
       "input_min": 0.20000000000000004,
       "input_max": 0.3500000000000001,
       "output_min": 0,
       "output_max": 1.0000000000000002,
-      "clamp": true
+      "clamp": true,
+      "value": [
+        "44",
+        0
+      ]
     },
     "class_type": "RenormalizeFloat",
     "_meta": {
@@ -383,62 +374,21 @@
   },
   "38": {
     "inputs": {
-      "value": [
+      "places": 2,
+      "int_or_float": [
         "32",
         0
-      ],
-      "decimal_places": 2
+      ]
     },
     "class_type": "RoundNode",
     "_meta": {
       "title": "Round Node 🕒🅡🅣🅝"
     }
   },
-  "40": {
-    "inputs": {
-      "x1": [
-        "30",
-        0
-      ],
-      "y1": [
-        "30",
-        1
-      ],
-      "x2": [
-        "31",
-        0
-      ],
-      "y2": [
-        "31",
-        1
-      ],
-      "thickness": 2,
-      "color_hex": "#00FF00",
-      "is_normalized": true,
-      "batch_mapping": "broadcast",
-      "draw_endpoints": true,
-      "point_radius": 3,
-      "draw_label": true,
-      "label_text": [
-        "41",
-        0
-      ],
-      "label_position": "Midpoint",
-      "font_scale": 0.5,
-      "image": [
-        "4",
-        0
-      ]
-    },
-    "class_type": "RTDrawLinesNode",
-    "_meta": {
-      "title": "Rt Draw Lines Node 🕒🅡🅣🅝"
-    }
-  },
   "41": {
     "inputs": {
       "format_string": "{}",
-      "prepend": "paint: ",
+      "prepend": "",
       "append": "",
       "any": [
         "38",
@@ -480,6 +430,58 @@
     "class_type": "CoordinateProximityNode",
     "_meta": {
       "title": "Coordinate Proximity Node 🕒🅡🅣🅝"
+    }
+  },
+  "55": {
+    "inputs": {
+      "thickness": 2,
+      "color_hex": "#00FF00",
+      "is_normalized": true,
+      "batch_mapping": "one-to-one",
+      "draw_endpoints": false,
+      "point_radius": 3,
+      "draw_label": true,
+      "label_prefix": "Paint: ",
+      "label_values": [
+        "41",
+        0
+      ],
+      "label_position": "Midpoint",
+      "font_scale": 0.5,
+      "batch_value_mode": "Index-based",
+      "image": [
+        "4",
+        0
+      ],
+      "x1": [
+        "30",
+        0
+      ],
+      "y1": [
+        "30",
+        1
+      ],
+      "x2": [
+        "31",
+        0
+      ],
+      "y2": [
+        "31",
+        1
+      ]
+    },
+    "class_type": "RTDrawLinesNode",
+    "_meta": {
+      "title": "Rt Draw Lines Node 🕒🅡🅣🅝"
+    }
+  },
+  "56": {
+    "inputs": {
+      "image": "example-512x512.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
     }
   }
 }
