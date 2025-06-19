@@ -1,8 +1,8 @@
 {
   "id": "00000000-0000-0000-0000-000000000000",
   "revision": 0,
-  "last_node_id": 54,
-  "last_link_id": 129,
+  "last_node_id": 57,
+  "last_link_id": 150,
   "nodes": [
     {
       "id": 19,
@@ -37,7 +37,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CLIPSetLastLayer"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "CLIPSetLastLayer",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         -2
@@ -68,7 +71,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "EmptyLatentImage"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "EmptyLatentImage",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         512,
@@ -100,7 +106,10 @@
       ],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "Display Any (rgthree)"
+        "cnr_id": "rgthree-comfy",
+        "ver": "6c5f7c95ed8487fe08e42bd0341cae6dc9c0f0ad",
+        "Node name for S&R": "Display Any (rgthree)",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         ""
@@ -137,7 +146,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CLIPTextEncode"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "CLIPTextEncode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         ""
@@ -174,7 +186,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "FeatureBankAttentionProcessor"
+        "aux_id": "livepeer/ComfyUI-Stream-Pack",
+        "ver": "f6e199090594bad1a604b45ed28ea4914c3db288",
+        "Node name for S&R": "FeatureBankAttentionProcessor",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         false,
@@ -209,7 +224,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "TensorRTLoader"
+        "aux_id": "yondonfu/ComfyUI_TensorRT",
+        "ver": "990a388dd4786cdfad7488ff7026817795fc691f",
+        "Node name for S&R": "TensorRTLoader",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "static-dreamshaper8_SD15_$stat-b-1-h-512-w-512_00001_.engine",
@@ -241,7 +259,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "VAELoader"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "VAELoader",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "taesd"
@@ -278,7 +299,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "TorchCompileLoadVAE"
+        "cnr_id": "comfyui-torch-compile",
+        "ver": "5de6422c8be8931930e4118b1457f8592e93dbce",
+        "Node name for S&R": "TorchCompileLoadVAE",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "inductor",
@@ -297,7 +321,7 @@
       ],
       "size": [
         315,
-        98
+        106
       ],
       "flags": {},
       "order": 3,
@@ -313,51 +337,15 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CLIPLoader"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "CLIPLoader",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "CLIPText/model.fp16.safetensors",
         "stable_diffusion",
         "default"
-      ]
-    },
-    {
-      "id": 21,
-      "type": "LoadImage",
-      "pos": [
-        135.612060546875,
-        949.022705078125
-      ],
-      "size": [
-        315,
-        314
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            49,
-            66
-          ]
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": null
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "example-512x512.png",
-        "image",
-        ""
       ]
     },
     {
@@ -372,7 +360,7 @@
         58
       ],
       "flags": {},
-      "order": 5,
+      "order": 4,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -385,7 +373,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "MediaPipeHandLandmarkerModelLoaderNode"
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "MediaPipeHandLandmarkerModelLoaderNode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "default"
@@ -417,16 +408,16 @@
           "name": "x",
           "type": "FLOAT",
           "links": [
-            80,
-            97
+            97,
+            131
           ]
         },
         {
           "name": "y",
           "type": "FLOAT",
           "links": [
-            81,
-            98
+            98,
+            132
           ]
         },
         {
@@ -453,7 +444,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "HandLandmarkPositionNode"
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "HandLandmarkPositionNode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         4,
@@ -485,7 +479,10 @@
       ],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "Display Any (rgthree)"
+        "cnr_id": "rgthree-comfy",
+        "ver": "6c5f7c95ed8487fe08e42bd0341cae6dc9c0f0ad",
+        "Node name for S&R": "Display Any (rgthree)",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         ""
@@ -509,58 +506,32 @@
         {
           "name": "x1",
           "type": "FLOAT",
-          "widget": {
-            "name": "x1"
-          },
-          "link": null
+          "link": 97
         },
         {
           "name": "y1",
           "type": "FLOAT",
-          "widget": {
-            "name": "y1"
-          },
           "link": 98
         },
         {
           "name": "z1",
           "type": "FLOAT",
-          "widget": {
-            "name": "z1"
-          },
           "link": 99
         },
         {
           "name": "x2",
           "type": "FLOAT",
-          "widget": {
-            "name": "x2"
-          },
           "link": 100
         },
         {
           "name": "y2",
           "type": "FLOAT",
-          "widget": {
-            "name": "y2"
-          },
           "link": 101
         },
         {
           "name": "z2",
           "type": "FLOAT",
-          "widget": {
-            "name": "z2"
-          },
           "link": 102
-        },
-        {
-          "name": "x1",
-          "type": "FLOAT",
-          "widget": {
-            "name": "x1"
-          },
-          "link": 97
         }
       ],
       "outputs": [
@@ -574,16 +545,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CoordinateProximityNode"
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "CoordinateProximityNode",
+        "widget_ue_connectable": {}
       },
-      "widgets_values": [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-      ]
+      "widgets_values": []
     },
     {
       "id": 25,
@@ -617,49 +584,13 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CLIPTextEncode"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "CLIPTextEncode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "paint abstract humanoid paint sculpture multicolored masterpiece"
-      ]
-    },
-    {
-      "id": 41,
-      "type": "ToString",
-      "pos": [
-        3452.4970703125,
-        1416.63427734375
-      ],
-      "size": [
-        315,
-        106
-      ],
-      "flags": {},
-      "order": 31,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "any",
-          "type": "*",
-          "link": 86
-        }
-      ],
-      "outputs": [
-        {
-          "name": "STRING",
-          "type": "STRING",
-          "links": [
-            84
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ToString"
-      },
-      "widgets_values": [
-        "{}",
-        "paint: ",
-        ""
       ]
     },
     {
@@ -674,7 +605,7 @@
         106
       ],
       "flags": {},
-      "order": 12,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
@@ -693,7 +624,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "TorchCompileLoadControlNet"
+        "cnr_id": "comfyui-torch-compile",
+        "ver": "5de6422c8be8931930e4118b1457f8592e93dbce",
+        "Node name for S&R": "TorchCompileLoadControlNet",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "inductor",
@@ -713,7 +647,7 @@
         58
       ],
       "flags": {},
-      "order": 6,
+      "order": 5,
       "mode": 0,
       "inputs": [],
       "outputs": [
@@ -726,7 +660,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ControlNetLoader"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "ControlNetLoader",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "control_v11f1p_sd15_depth_fp16.safetensors"
@@ -744,13 +681,13 @@
         58
       ],
       "flags": {},
-      "order": 10,
+      "order": 12,
       "mode": 0,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 49
+          "link": 149
         }
       ],
       "outputs": [
@@ -763,7 +700,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "DepthAnythingTensorrt"
+        "cnr_id": "ComfyUI-Depth-Anything-Tensorrt",
+        "ver": "6c3d65023df3f106679ff4522aeea502dd964a3a",
+        "Node name for S&R": "DepthAnythingTensorrt",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "depth_anything_vitl14-fp16.engine"
@@ -815,10 +755,13 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "KSampler"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "KSampler",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
-        245202513098312,
+        106022323590491,
         "randomize",
         2,
         1,
@@ -853,16 +796,16 @@
           "name": "x",
           "type": "FLOAT",
           "links": [
-            82,
-            100
+            100,
+            133
           ]
         },
         {
           "name": "y",
           "type": "FLOAT",
           "links": [
-            83,
-            101
+            101,
+            134
           ]
         },
         {
@@ -889,7 +832,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "HandLandmarkPositionNode"
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "HandLandmarkPositionNode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         8,
@@ -921,7 +867,10 @@
       ],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "Display Any (rgthree)"
+        "cnr_id": "rgthree-comfy",
+        "ver": "6c5f7c95ed8487fe08e42bd0341cae6dc9c0f0ad",
+        "Node name for S&R": "Display Any (rgthree)",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         ""
@@ -951,7 +900,10 @@
       ],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "Display Any (rgthree)"
+        "cnr_id": "rgthree-comfy",
+        "ver": "6c5f7c95ed8487fe08e42bd0341cae6dc9c0f0ad",
+        "Node name for S&R": "Display Any (rgthree)",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         ""
@@ -975,58 +927,32 @@
         {
           "name": "x1",
           "type": "FLOAT",
-          "widget": {
-            "name": "x1"
-          },
-          "link": null
+          "link": 113
         },
         {
           "name": "y1",
           "type": "FLOAT",
-          "widget": {
-            "name": "y1"
-          },
           "link": 108
         },
         {
           "name": "z1",
           "type": "FLOAT",
-          "widget": {
-            "name": "z1"
-          },
           "link": 109
         },
         {
           "name": "x2",
           "type": "FLOAT",
-          "widget": {
-            "name": "x2"
-          },
           "link": 110
         },
         {
           "name": "y2",
           "type": "FLOAT",
-          "widget": {
-            "name": "y2"
-          },
           "link": 111
         },
         {
           "name": "z2",
           "type": "FLOAT",
-          "widget": {
-            "name": "z2"
-          },
           "link": 112
-        },
-        {
-          "name": "x1",
-          "type": "FLOAT",
-          "widget": {
-            "name": "x1"
-          },
-          "link": 113
         }
       ],
       "outputs": [
@@ -1040,16 +966,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CoordinateProximityNode"
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "CoordinateProximityNode",
+        "widget_ue_connectable": {}
       },
-      "widgets_values": [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-      ]
+      "widgets_values": []
     },
     {
       "id": 28,
@@ -1069,7 +991,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 66
+          "link": 148
         },
         {
           "name": "model_info",
@@ -1095,7 +1017,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "MediaPipeHandLandmarkerNode"
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "MediaPipeHandLandmarkerNode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "video",
@@ -1104,87 +1029,6 @@
         0.5000000000000001,
         0.5000000000000001,
         0.5000000000000001
-      ]
-    },
-    {
-      "id": 38,
-      "type": "RoundNode",
-      "pos": [
-        3045.984130859375,
-        1290.6689453125
-      ],
-      "size": [
-        315,
-        82
-      ],
-      "flags": {},
-      "order": 27,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "value",
-          "type": "FLOAT",
-          "widget": {
-            "name": "value"
-          },
-          "link": 79
-        }
-      ],
-      "outputs": [
-        {
-          "name": "rounded_value",
-          "type": "FLOAT",
-          "links": [
-            62,
-            86
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "RoundNode"
-      },
-      "widgets_values": [
-        0,
-        2
-      ]
-    },
-    {
-      "id": 52,
-      "type": "ToString",
-      "pos": [
-        3480,
-        2150
-      ],
-      "size": [
-        315,
-        106
-      ],
-      "flags": {},
-      "order": 32,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "any",
-          "type": "*",
-          "link": 115
-        }
-      ],
-      "outputs": [
-        {
-          "name": "STRING",
-          "type": "STRING",
-          "links": [
-            121
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ToString"
-      },
-      "widgets_values": [
-        "{}",
-        "dream: ",
-        ""
       ]
     },
     {
@@ -1214,7 +1058,7 @@
           "type": "FLOAT",
           "links": [
             113,
-            122
+            137
           ]
         },
         {
@@ -1222,7 +1066,7 @@
           "type": "FLOAT",
           "links": [
             108,
-            123
+            138
           ]
         },
         {
@@ -1249,7 +1093,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "HandLandmarkPositionNode"
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "HandLandmarkPositionNode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         4,
@@ -1284,7 +1131,7 @@
           "type": "FLOAT",
           "links": [
             110,
-            124
+            139
           ]
         },
         {
@@ -1292,7 +1139,7 @@
           "type": "FLOAT",
           "links": [
             111,
-            125
+            140
           ]
         },
         {
@@ -1319,100 +1166,15 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "HandLandmarkPositionNode"
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "HandLandmarkPositionNode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         8,
         1,
         false
-      ]
-    },
-    {
-      "id": 51,
-      "type": "RoundNode",
-      "pos": [
-        3088.175537109375,
-        1867.9375
-      ],
-      "size": [
-        315,
-        82
-      ],
-      "flags": {},
-      "order": 29,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "value",
-          "type": "FLOAT",
-          "widget": {
-            "name": "value"
-          },
-          "link": 114
-        }
-      ],
-      "outputs": [
-        {
-          "name": "rounded_value",
-          "type": "FLOAT",
-          "links": [
-            115,
-            126
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "RoundNode"
-      },
-      "widgets_values": [
-        0,
-        2
-      ]
-    },
-    {
-      "id": 32,
-      "type": "RenormalizeFloat",
-      "pos": [
-        2596.10595703125,
-        1181.9354248046875
-      ],
-      "size": [
-        327.5999755859375,
-        178
-      ],
-      "flags": {},
-      "order": 22,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "value",
-          "type": "FLOAT",
-          "widget": {
-            "name": "value"
-          },
-          "link": 103
-        }
-      ],
-      "outputs": [
-        {
-          "name": "renormalized",
-          "type": "FLOAT",
-          "links": [
-            78,
-            79
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "RenormalizeFloat"
-      },
-      "widgets_values": [
-        0.5,
-        0.20000000000000004,
-        0.3500000000000001,
-        0,
-        1.0000000000000002,
-        true
       ]
     },
     {
@@ -1459,7 +1221,12 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ConditioningAverage"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "ConditioningAverage",
+        "widget_ue_connectable": {
+          "conditioning_to_strength": true
+        }
       },
       "widgets_values": [
         1
@@ -1496,56 +1263,13 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CLIPTextEncode"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "CLIPTextEncode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": [
         "beautiful pencil sketch, masterpiece, greyscale"
-      ]
-    },
-    {
-      "id": 48,
-      "type": "RenormalizeFloat",
-      "pos": [
-        2666.854248046875,
-        1929.827880859375
-      ],
-      "size": [
-        327.5999755859375,
-        178
-      ],
-      "flags": {},
-      "order": 24,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "value",
-          "type": "FLOAT",
-          "widget": {
-            "name": "value"
-          },
-          "link": 106
-        }
-      ],
-      "outputs": [
-        {
-          "name": "renormalized",
-          "type": "FLOAT",
-          "links": [
-            105,
-            114
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "RenormalizeFloat"
-      },
-      "widgets_values": [
-        0.5,
-        0.20000000000000004,
-        0.3500000000000001,
-        0.15000000000000002,
-        1.0000000000000002,
-        true
       ]
     },
     {
@@ -1615,12 +1339,514 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "ControlNetApplyAdvanced"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "ControlNetApplyAdvanced",
+        "widget_ue_connectable": {
+          "strength": true
+        }
       },
       "widgets_values": [
         0.7000000000000002,
         0,
         1
+      ]
+    },
+    {
+      "id": 5,
+      "type": "PreviewImage",
+      "pos": [
+        7649.77880859375,
+        1321.267578125
+      ],
+      "size": [
+        210,
+        246
+      ],
+      "flags": {},
+      "order": 38,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 141
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "PreviewImage",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 51,
+      "type": "RoundNode",
+      "pos": [
+        3088.175537109375,
+        1867.9375
+      ],
+      "size": [
+        315,
+        82
+      ],
+      "flags": {},
+      "order": 29,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "int_or_float",
+          "type": "*",
+          "link": 142
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rounded_value",
+          "type": "FLOAT",
+          "links": [
+            115,
+            126
+          ]
+        },
+        {
+          "name": "rounded_int",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "RoundNode",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        2
+      ]
+    },
+    {
+      "id": 48,
+      "type": "RenormalizeFloat",
+      "pos": [
+        2666.854248046875,
+        1929.827880859375
+      ],
+      "size": [
+        327.5999755859375,
+        178
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "value",
+          "type": "FLOAT",
+          "link": 106
+        }
+      ],
+      "outputs": [
+        {
+          "name": "renormalized",
+          "type": "FLOAT",
+          "links": [
+            105,
+            142
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "RenormalizeFloat",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        0.20000000000000004,
+        0.3500000000000001,
+        0.15000000000000002,
+        1.0000000000000002,
+        true
+      ]
+    },
+    {
+      "id": 52,
+      "type": "ToString",
+      "pos": [
+        3855.896240234375,
+        2265.229736328125
+      ],
+      "size": [
+        315,
+        106
+      ],
+      "flags": {},
+      "order": 32,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "any",
+          "type": "*",
+          "link": 115
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            143
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "ToString",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "{}",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 38,
+      "type": "RoundNode",
+      "pos": [
+        3045.984130859375,
+        1290.6689453125
+      ],
+      "size": [
+        315,
+        82
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "int_or_float",
+          "type": "*",
+          "link": 145
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rounded_value",
+          "type": "FLOAT",
+          "links": [
+            62,
+            86
+          ]
+        },
+        {
+          "name": "rounded_int",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "RoundNode",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        2
+      ]
+    },
+    {
+      "id": 32,
+      "type": "RenormalizeFloat",
+      "pos": [
+        2596.10595703125,
+        1181.9354248046875
+      ],
+      "size": [
+        327.5999755859375,
+        178
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "value",
+          "type": "FLOAT",
+          "link": 103
+        }
+      ],
+      "outputs": [
+        {
+          "name": "renormalized",
+          "type": "FLOAT",
+          "links": [
+            78,
+            145
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "RenormalizeFloat",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        0.20000000000000004,
+        0.3500000000000001,
+        0,
+        1.0000000000000002,
+        true
+      ]
+    },
+    {
+      "id": 41,
+      "type": "ToString",
+      "pos": [
+        3475.19091796875,
+        1412.4315185546875
+      ],
+      "size": [
+        315,
+        106
+      ],
+      "flags": {},
+      "order": 31,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "any",
+          "type": "*",
+          "link": 86
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            146
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "Node name for S&R": "ToString",
+        "widget_ue_connectable": {}
+      },
+      "widgets_values": [
+        "{}",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 55,
+      "type": "RTDrawLinesNode",
+      "pos": [
+        6484.01318359375,
+        1207.9716796875
+      ],
+      "size": [
+        340.20001220703125,
+        402
+      ],
+      "flags": {},
+      "order": 36,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 150
+        },
+        {
+          "name": "x1",
+          "type": "FLOAT",
+          "link": 131
+        },
+        {
+          "name": "y1",
+          "type": "FLOAT",
+          "link": 132
+        },
+        {
+          "name": "x2",
+          "type": "FLOAT",
+          "link": 133
+        },
+        {
+          "name": "y2",
+          "type": "FLOAT",
+          "link": 134
+        },
+        {
+          "name": "label_values",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "label_values"
+          },
+          "link": 146
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image_out",
+          "type": "IMAGE",
+          "links": [
+            136
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "widget_ue_connectable": {},
+        "Node name for S&R": "RTDrawLinesNode"
+      },
+      "widgets_values": [
+        2,
+        "#00FF00",
+        true,
+        "one-to-one",
+        false,
+        3,
+        true,
+        "Line2: ",
+        "",
+        "Midpoint",
+        0.5,
+        "Index-based"
+      ]
+    },
+    {
+      "id": 56,
+      "type": "RTDrawLinesNode",
+      "pos": [
+        7113.59375,
+        1774.6485595703125
+      ],
+      "size": [
+        340.20001220703125,
+        402
+      ],
+      "flags": {},
+      "order": 37,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 136
+        },
+        {
+          "name": "x1",
+          "type": "FLOAT",
+          "link": 137
+        },
+        {
+          "name": "y1",
+          "type": "FLOAT",
+          "link": 138
+        },
+        {
+          "name": "x2",
+          "type": "FLOAT",
+          "link": 139
+        },
+        {
+          "name": "y2",
+          "type": "FLOAT",
+          "link": 140
+        },
+        {
+          "name": "label_values",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "label_values"
+          },
+          "link": 143
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image_out",
+          "type": "IMAGE",
+          "links": [
+            141
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "ryanontheinside/ComfyUI_RealtimeNodes",
+        "ver": "c544aa2fd78ab2e4fdb8152a76c86d1b2e46624a",
+        "widget_ue_connectable": {},
+        "Node name for S&R": "RTDrawLinesNode"
+      },
+      "widgets_values": [
+        2,
+        "#00FF00",
+        true,
+        "one-to-one",
+        false,
+        3,
+        true,
+        "Line1:",
+        "",
+        "Midpoint",
+        0.5,
+        "Index-based"
+      ]
+    },
+    {
+      "id": 57,
+      "type": "LoadImage",
+      "pos": [
+        -735.308837890625,
+        1195.076416015625
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            148,
+            149
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "widget_ue_connectable": {},
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example-512x512.png",
+        "image"
       ]
     },
     {
@@ -1654,233 +1880,17 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            85
+            150
           ]
         }
       ],
       "properties": {
-        "Node name for S&R": "VAEDecode"
+        "cnr_id": "comfy-core",
+        "ver": "0.3.30",
+        "Node name for S&R": "VAEDecode",
+        "widget_ue_connectable": {}
       },
       "widgets_values": []
-    },
-    {
-      "id": 40,
-      "type": "RTDrawLinesNode",
-      "pos": [
-        6484.01318359375,
-        1207.9716796875
-      ],
-      "size": [
-        340.20001220703125,
-        370
-      ],
-      "flags": {},
-      "order": 36,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 85
-        },
-        {
-          "name": "x1",
-          "type": "FLOAT",
-          "widget": {
-            "name": "x1"
-          },
-          "link": 80
-        },
-        {
-          "name": "y1",
-          "type": "FLOAT",
-          "widget": {
-            "name": "y1"
-          },
-          "link": 81
-        },
-        {
-          "name": "x2",
-          "type": "FLOAT",
-          "widget": {
-            "name": "x2"
-          },
-          "link": 82
-        },
-        {
-          "name": "y2",
-          "type": "FLOAT",
-          "widget": {
-            "name": "y2"
-          },
-          "link": 83
-        },
-        {
-          "name": "label_text",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "label_text"
-          },
-          "link": 84
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image_out",
-          "type": "IMAGE",
-          "links": [
-            119
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "RTDrawLinesNode"
-      },
-      "widgets_values": [
-        0.25,
-        0.25,
-        0.75,
-        0.75,
-        2,
-        "#00FF00",
-        true,
-        "broadcast",
-        true,
-        3,
-        true,
-        "Line",
-        "Midpoint",
-        0.5
-      ]
-    },
-    {
-      "id": 5,
-      "type": "PreviewImage",
-      "pos": [
-        7649.77880859375,
-        1321.267578125
-      ],
-      "size": [
-        210,
-        246
-      ],
-      "flags": {},
-      "order": 38,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 120
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": [
-        ""
-      ]
-    },
-    {
-      "id": 53,
-      "type": "RTDrawLinesNode",
-      "pos": [
-        6866.26416015625,
-        2026.8919677734375
-      ],
-      "size": [
-        340.20001220703125,
-        370
-      ],
-      "flags": {},
-      "order": 37,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 119
-        },
-        {
-          "name": "x1",
-          "type": "FLOAT",
-          "widget": {
-            "name": "x1"
-          },
-          "link": 122
-        },
-        {
-          "name": "y1",
-          "type": "FLOAT",
-          "widget": {
-            "name": "y1"
-          },
-          "link": null
-        },
-        {
-          "name": "x2",
-          "type": "FLOAT",
-          "widget": {
-            "name": "x2"
-          },
-          "link": 124
-        },
-        {
-          "name": "y2",
-          "type": "FLOAT",
-          "widget": {
-            "name": "y2"
-          },
-          "link": 125
-        },
-        {
-          "name": "label_text",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "label_text"
-          },
-          "link": 121
-        },
-        {
-          "name": "y1",
-          "type": "FLOAT",
-          "widget": {
-            "name": "y1"
-          },
-          "link": 123
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image_out",
-          "type": "IMAGE",
-          "links": [
-            120
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "RTDrawLinesNode"
-      },
-      "widgets_values": [
-        0.25,
-        0.25,
-        0.75,
-        0.75,
-        2,
-        "#00FF00",
-        true,
-        "broadcast",
-        true,
-        3,
-        true,
-        "Line",
-        "Midpoint",
-        0.5
-      ]
     }
   ],
   "links": [
@@ -1915,14 +1925,6 @@
       4,
       1,
       "VAE"
-    ],
-    [
-      49,
-      21,
-      0,
-      10,
-      0,
-      "IMAGE"
     ],
     [
       50,
@@ -2037,14 +2039,6 @@
       "CLIP"
     ],
     [
-      66,
-      21,
-      0,
-      28,
-      0,
-      "IMAGE"
-    ],
-    [
       67,
       29,
       0,
@@ -2077,62 +2071,6 @@
       "*"
     ],
     [
-      79,
-      32,
-      0,
-      38,
-      0,
-      "FLOAT"
-    ],
-    [
-      80,
-      30,
-      0,
-      40,
-      1,
-      "FLOAT"
-    ],
-    [
-      81,
-      30,
-      1,
-      40,
-      2,
-      "FLOAT"
-    ],
-    [
-      82,
-      31,
-      0,
-      40,
-      3,
-      "FLOAT"
-    ],
-    [
-      83,
-      31,
-      1,
-      40,
-      4,
-      "FLOAT"
-    ],
-    [
-      84,
-      41,
-      0,
-      40,
-      5,
-      "STRING"
-    ],
-    [
-      85,
-      4,
-      0,
-      40,
-      0,
-      "IMAGE"
-    ],
-    [
       86,
       38,
       0,
@@ -2145,7 +2083,7 @@
       30,
       0,
       44,
-      6,
+      0,
       "FLOAT"
     ],
     [
@@ -2273,14 +2211,6 @@
       47,
       0,
       50,
-      6,
-      "FLOAT"
-    ],
-    [
-      114,
-      48,
-      0,
-      51,
       0,
       "FLOAT"
     ],
@@ -2309,62 +2239,6 @@
       "HAND_LANDMARKS"
     ],
     [
-      119,
-      40,
-      0,
-      53,
-      0,
-      "IMAGE"
-    ],
-    [
-      120,
-      53,
-      0,
-      5,
-      0,
-      "IMAGE"
-    ],
-    [
-      121,
-      52,
-      0,
-      53,
-      5,
-      "STRING"
-    ],
-    [
-      122,
-      47,
-      0,
-      53,
-      1,
-      "FLOAT"
-    ],
-    [
-      123,
-      47,
-      1,
-      53,
-      6,
-      "FLOAT"
-    ],
-    [
-      124,
-      45,
-      0,
-      53,
-      3,
-      "FLOAT"
-    ],
-    [
-      125,
-      45,
-      1,
-      53,
-      4,
-      "FLOAT"
-    ],
-    [
       126,
       51,
       0,
@@ -2387,6 +2261,142 @@
       24,
       0,
       "CONDITIONING"
+    ],
+    [
+      131,
+      30,
+      0,
+      55,
+      1,
+      "FLOAT"
+    ],
+    [
+      132,
+      30,
+      1,
+      55,
+      2,
+      "FLOAT"
+    ],
+    [
+      133,
+      31,
+      0,
+      55,
+      3,
+      "FLOAT"
+    ],
+    [
+      134,
+      31,
+      1,
+      55,
+      4,
+      "FLOAT"
+    ],
+    [
+      136,
+      55,
+      0,
+      56,
+      0,
+      "IMAGE"
+    ],
+    [
+      137,
+      47,
+      0,
+      56,
+      1,
+      "FLOAT"
+    ],
+    [
+      138,
+      47,
+      1,
+      56,
+      2,
+      "FLOAT"
+    ],
+    [
+      139,
+      45,
+      0,
+      56,
+      3,
+      "FLOAT"
+    ],
+    [
+      140,
+      45,
+      1,
+      56,
+      4,
+      "FLOAT"
+    ],
+    [
+      141,
+      56,
+      0,
+      5,
+      0,
+      "IMAGE"
+    ],
+    [
+      142,
+      48,
+      0,
+      51,
+      0,
+      "*"
+    ],
+    [
+      143,
+      52,
+      0,
+      56,
+      5,
+      "STRING"
+    ],
+    [
+      145,
+      32,
+      0,
+      38,
+      0,
+      "*"
+    ],
+    [
+      146,
+      41,
+      0,
+      55,
+      5,
+      "STRING"
+    ],
+    [
+      148,
+      57,
+      0,
+      28,
+      0,
+      "IMAGE"
+    ],
+    [
+      149,
+      57,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      150,
+      4,
+      0,
+      55,
+      0,
+      "IMAGE"
     ]
   ],
   "groups": [
@@ -2433,12 +2443,19 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.19487171000000303,
+      "scale": 0.2593742460100051,
       "offset": [
-        -179.35552244654593,
-        -994.5576064370631
+        1178.7744295597272,
+        1031.7183551522253
       ]
-    }
+    },
+    "ue_links": [],
+    "links_added_by_ue": [],
+    "frontendVersion": "1.17.11",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
   },
   "version": 0.4
 }
